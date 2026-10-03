@@ -6,6 +6,7 @@ import {
   profile,
   dashboard,
   history,
+  deleteHistory,
   favorites,
   usage,
 } from "../controllers/userController.js";
@@ -28,6 +29,12 @@ router.get(
   "/history",
   protect,
   history
+);
+
+router.delete(
+    "/history/:id",
+    protect,
+    deleteHistory
 );
 
 router.get(

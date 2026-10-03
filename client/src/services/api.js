@@ -75,7 +75,6 @@ export const aiApi = {
 /* =========================
    USER / DASHBOARD API
 ========================= */
-
 export const userApi = {
   dashboard: () =>
     api.get("/user/dashboard"),
@@ -85,6 +84,9 @@ export const userApi = {
 
   history: () =>
     api.get("/user/history"),
+
+  deleteHistory: (id) =>
+    api.delete(`/user/history/${id}`),
 
   favorites: () =>
     api.get("/user/favorites"),

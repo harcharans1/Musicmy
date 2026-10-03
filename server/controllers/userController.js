@@ -181,12 +181,13 @@ export async function dashboard(req, res) {
 /* =========================
    HISTORY
 ========================= */
-
 export async function history(req, res) {
   try {
     const { data, error } = await supabase
       .from("generations")
-      .select("*")
+      .select(
+        "id,title,content,question,answer,slug,status,amount,provider,created_at"
+      )
       .eq("user_id", req.user.id)
       .order("created_at", {
         ascending: false,
@@ -198,13 +199,35 @@ export async function history(req, res) {
       generations: data || [],
     });
   } catch (error) {
-    console.error(
-      "History error:",
-      error
-    );
+    console.error("History error:", error);
 
     res.status(500).json({
       message: "Failed to load history",
+    });
+  }
+}
+
+export async function deleteHistory(req, res) {
+  try {
+    const { id } = req.params;
+
+    const { error } = await supabase
+      .from("generations")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", req.user.id);
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      message: "History deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete history error:", error);
+
+    res.status(500).json({
+      message: "Failed to delete history",
     });
   }
 }
