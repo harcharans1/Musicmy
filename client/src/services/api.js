@@ -71,6 +71,28 @@ export const aiApi = {
   translate: (data) =>
     api.post("/ai/translate", data),
 };
+
+/* =========================
+   USER / DASHBOARD API
+========================= */
+
+export const userApi = {
+  dashboard: () =>
+    api.get("/user/dashboard"),
+
+  profile: () =>
+    api.get("/user/profile"),
+
+  history: () =>
+    api.get("/user/history"),
+
+  favorites: () =>
+    api.get("/user/favorites"),
+
+  usage: () =>
+    api.get("/user/usage"),
+};
+
 /* =========================
    SAVED OUTPUTS API
 ========================= */
