@@ -8,6 +8,8 @@ import {
   history,
   deleteHistory,
   favorites,
+  addFavorite,
+  removeFavorite,
   usage,
 } from "../controllers/userController.js";
 
@@ -41,6 +43,18 @@ router.get(
   "/favorites",
   protect,
   favorites
+);
+
+router.post(
+  "/favorites",
+  protect,
+  addFavorite
+);
+
+router.delete(
+  "/favorites/:id",
+  protect,
+  removeFavorite
 );
 
 router.get(

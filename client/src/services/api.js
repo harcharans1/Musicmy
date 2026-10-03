@@ -91,6 +91,14 @@ export const userApi = {
   favorites: () =>
     api.get("/user/favorites"),
 
+  addFavorite: (generationId) =>
+  api.post("/user/favorites", {
+    generationId,
+  }),
+
+  removeFavorite: (id) =>
+  api.delete(`/user/favorites/${id}`),
+
   usage: () =>
     api.get("/user/usage"),
 };

@@ -236,20 +236,66 @@ export async function deleteHistory(req, res) {
    FAVORITES
 ========================= */
 
+/* =========================
+   FAVORITES
+========================= */
+
 export async function favorites(req, res) {
   try {
-    const { data, error } = await supabase
-      .from("favorites")
-      .select("*")
-      .eq("user_id", req.user.id)
-      .order("created_at", {
-        ascending: false,
-      });
+    const { data: favoriteRows, error } =
+      await supabase
+        .from("favorites")
+        .select("id,generation_id,created_at")
+        .eq("user_id", req.user.id)
+        .order("created_at", {
+          ascending: false,
+        });
 
     if (error) throw error;
 
+    const generationIds =
+      (favoriteRows || [])
+        .map((item) => item.generation_id)
+        .filter(Boolean);
+
+    if (!generationIds.length) {
+      return res.json({
+        favorites: [],
+      });
+    }
+
+    const { data: generations, error: generationError } =
+      await supabase
+        .from("generations")
+        .select(
+          "id,title,content,question,answer,slug,status,amount,provider,created_at"
+        )
+        .in("id", generationIds)
+        .eq("user_id", req.user.id);
+
+    if (generationError) {
+      throw generationError;
+    }
+
+    const generationMap = new Map(
+      (generations || []).map((item) => [
+        item.id,
+        item,
+      ])
+    );
+
+    const result = (favoriteRows || [])
+      .map((favorite) => ({
+        ...favorite,
+        generation:
+          generationMap.get(
+            favorite.generation_id
+          ) || null,
+      }))
+      .filter((item) => item.generation);
+
     res.json({
-      favorites: data || [],
+      favorites: result,
     });
   } catch (error) {
     console.error(
@@ -259,6 +305,117 @@ export async function favorites(req, res) {
 
     res.status(500).json({
       message: "Failed to load favorites",
+    });
+  }
+}
+
+
+/* =========================
+   ADD FAVORITE
+========================= */
+
+export async function addFavorite(req, res) {
+  try {
+    const { generationId } =
+      req.body;
+
+    if (!generationId) {
+      return res.status(400).json({
+        message:
+          "Generation ID is required",
+      });
+    }
+
+    const { data: generation, error: generationError } =
+      await supabase
+        .from("generations")
+        .select("id")
+        .eq("id", generationId)
+        .eq("user_id", req.user.id)
+        .maybeSingle();
+
+    if (generationError) {
+      throw generationError;
+    }
+
+    if (!generation) {
+      return res.status(404).json({
+        message:
+          "Generation not found",
+      });
+    }
+
+    const { data, error } =
+      await supabase
+        .from("favorites")
+        .upsert(
+          {
+            user_id: req.user.id,
+            generation_id: generationId,
+          },
+          {
+            onConflict:
+              "user_id,generation_id",
+          }
+        )
+        .select(
+          "id,generation_id,created_at"
+        )
+        .single();
+
+    if (error) throw error;
+
+    res.status(201).json({
+      success: true,
+      message:
+        "Added to favorites",
+      favorite: data,
+    });
+  } catch (error) {
+    console.error(
+      "Add favorite error:",
+      error
+    );
+
+    res.status(500).json({
+      message:
+        "Failed to add favorite",
+    });
+  }
+}
+
+
+/* =========================
+   REMOVE FAVORITE
+========================= */
+
+export async function removeFavorite(req, res) {
+  try {
+    const { id } = req.params;
+
+    const { error } =
+      await supabase
+        .from("favorites")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", req.user.id);
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      message:
+        "Removed from favorites",
+    });
+  } catch (error) {
+    console.error(
+      "Remove favorite error:",
+      error
+    );
+
+    res.status(500).json({
+      message:
+        "Failed to remove favorite",
     });
   }
 }
