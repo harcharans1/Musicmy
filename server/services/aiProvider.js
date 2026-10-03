@@ -1,1 +1,41 @@
-export class DemoProvider{async generateText({prompt,toolSlug}){return `Demo AI response for ${toolSlug}.\n\nPrompt: ${prompt}\n\nDEMO_MODE is enabled. Configure an AI provider to connect a live model.`}async generateImage({prompt}){return{url:'https://placehold.co/1024x1024/11131b/8b5cf6?text=AIForge+Demo',prompt}}async summarize({text}){return`Demo summary:\n\n${text.slice(0,700)}\n\n[Generated in demo mode]`}async translate({text,target}){return`[Demo ${target||'English'} translation]\n\n${text}`}}export function getAIProvider(){return new DemoProvider()}
+export class DemoProvider {
+  constructor() {
+    this.name = "demo";
+  }
+
+  async generate({ prompt, type }) {
+    return `Demo AI response.
+
+Type: ${type || "text"}
+
+Prompt:
+${prompt}
+
+DEMO_MODE is enabled. Configure an AI provider to connect a live AI model.`;
+  }
+
+  async image({ prompt }) {
+    return {
+      url: "https://placehold.co/1024x1024/11131b/8b5cf6?text=AIForge+Demo",
+      prompt,
+    };
+  }
+
+  async summarize({ text }) {
+    return `Demo summary:
+
+${text.slice(0, 700)}
+
+[Generated in demo mode]`;
+  }
+
+  async translate({ text, language }) {
+    return `[Demo ${language || "English"} translation]
+
+${text}`;
+  }
+}
+
+export function getAIProvider() {
+  return new DemoProvider();
+}
