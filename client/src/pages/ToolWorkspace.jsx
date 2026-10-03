@@ -73,9 +73,9 @@ export default function ToolWorkspace() {
 
         setOut(
           response.data?.result ||
-          response.data?.output ||
-          response.data?.text ||
-          ""
+            response.data?.output ||
+            response.data?.text ||
+            ""
         );
 
         return;
@@ -95,9 +95,9 @@ export default function ToolWorkspace() {
 
         setOut(
           response.data?.result ||
-          response.data?.output ||
-          response.data?.text ||
-          ""
+            response.data?.output ||
+            response.data?.text ||
+            ""
         );
 
         return;
@@ -116,22 +116,26 @@ export default function ToolWorkspace() {
 
       setOut(
         response.data?.result ||
-        response.data?.output ||
-        response.data?.text ||
-        ""
+          response.data?.output ||
+          response.data?.text ||
+          ""
       );
     } catch (error) {
       console.error("AI Tool Error:", error);
 
       setOut(
         error.response?.data?.message ||
-        error.message ||
-        "Something went wrong. Please try again."
+          error.message ||
+          "Something went wrong. Please try again."
       );
     } finally {
       setBusy(false);
     }
   };
+
+  /* =========================
+     COPY
+  ========================= */
 
   const copyOutput = async () => {
     if (!out) return;
@@ -142,6 +146,10 @@ export default function ToolWorkspace() {
       console.error("Copy failed:", error);
     }
   };
+
+  /* =========================
+     DOWNLOAD
+  ========================= */
 
   const downloadOutput = () => {
     if (!out) return;
@@ -162,6 +170,8 @@ export default function ToolWorkspace() {
 
   return (
     <div className="mx-auto max-w-7xl py-8">
+      {/* HEADER */}
+
       <p className="text-xs uppercase tracking-[.2em] text-violet-400">
         AI WORKSPACE
       </p>
@@ -172,7 +182,9 @@ export default function ToolWorkspace() {
 
       <div className="mt-7 grid gap-5 lg:grid-cols-2">
 
-        {/* INPUT */}
+        {/* =========================
+            INPUT
+        ========================= */}
 
         <section className="glass rounded-2xl p-5">
           <h2 className="font-semibold">
@@ -205,10 +217,12 @@ export default function ToolWorkspace() {
           </Button>
         </section>
 
-        {/* OUTPUT */}
+        {/* =========================
+            OUTPUT
+        ========================= */}
 
         <section className="glass rounded-2xl p-5">
-          <div className="flex justify-between">
+          <div className="flex items-center justify-between">
             <h2 className="font-semibold">
               Output
             </h2>
@@ -218,16 +232,21 @@ export default function ToolWorkspace() {
                 onClick={copyOutput}
                 disabled={!out}
                 title="Copy"
+                className="transition hover:text-violet-400 disabled:opacity-30"
               >
                 <Copy size={15} />
               </button>
 
               <button
                 onClick={() =>
-                  console.log("Save output:", out)
+                  console.log(
+                    "Save output:",
+                    out
+                  )
                 }
                 disabled={!out}
                 title="Save"
+                className="transition hover:text-violet-400 disabled:opacity-30"
               >
                 <Save size={15} />
               </button>
@@ -236,21 +255,46 @@ export default function ToolWorkspace() {
                 onClick={downloadOutput}
                 disabled={!out}
                 title="Download"
+                className="transition hover:text-violet-400 disabled:opacity-30"
               >
                 <Download size={15} />
               </button>
             </div>
           </div>
 
-          <div className="mt-4 min-h-[330px] whitespace-pre-wrap rounded-xl border border-white/5 bg-black/20 p-5 text-sm leading-7 text-slate-300">
+          {/* =========================
+              SCROLLABLE OUTPUT BOX
+          ========================= */}
 
+          <div
+            className="
+              mt-4
+              min-h-[330px]
+              max-h-[500px]
+              overflow-y-auto
+              overflow-x-hidden
+              whitespace-pre-wrap
+              break-words
+              rounded-xl
+              border
+              border-white/5
+              bg-black/20
+              p-5
+              text-sm
+              leading-7
+              text-slate-300
+              scrollbar-thin
+              scrollbar-thumb-violet-500/40
+              scrollbar-track-transparent
+            "
+          >
             {out ? (
               slug === "ai-image-generator" &&
               out.startsWith("http") ? (
                 <img
                   src={out}
                   alt="Generated AI"
-                  className="max-h-[500px] w-full rounded-xl object-contain"
+                  className="max-h-[450px] w-full rounded-xl object-contain"
                 />
               ) : (
                 out
@@ -260,7 +304,6 @@ export default function ToolWorkspace() {
                 Your generated result will appear here.
               </span>
             )}
-
           </div>
         </section>
       </div>
