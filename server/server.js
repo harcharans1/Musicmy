@@ -98,22 +98,10 @@ app.get("/api/health", (req, res) => {
 ========================= */
 
 app.use("/api/auth", auth);
-<<<<<<< HEAD
 app.use("/api/tools", tools);
 app.use("/api/ai", ai);
 app.use("/api/user", user);
 app.use("/api/payment", payment);
-=======
-
-app.use("/api/tools", tools);
-
-app.use("/api/ai", ai);
-
-app.use("/api/user", user);
-
-app.use("/api/payment", payment);
-
->>>>>>> 5dcf341 (Fix CORS and update Supabase backend)
 app.use("/api/admin", admin);
 
 /* =========================
@@ -121,10 +109,6 @@ app.use("/api/admin", admin);
 ========================= */
 
 app.use(notFound);
-<<<<<<< HEAD
-=======
-
->>>>>>> 5dcf341 (Fix CORS and update Supabase backend)
 app.use(errorHandler);
 
 /* =========================
