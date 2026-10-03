@@ -1,0 +1,1 @@
+import{Router}from'express';import{generate,image,summarize,translate}from'../controllers/aiController.js';import{protect}from'../middleware/auth.js';const r=Router();r.post('/generate',protect,generate);r.post('/image',protect,image);r.post('/summarize',protect,summarize);r.post('/translate',protect,translate);export default r;

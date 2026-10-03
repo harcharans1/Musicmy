@@ -1,0 +1,1 @@
+import{Router}from'express';import{protect}from'../middleware/auth.js';import{createPayment,verifyPayment,webhook}from'../controllers/paymentController.js';const r=Router();r.post('/create',protect,createPayment);r.post('/verify',protect,verifyPayment);r.post('/webhook',webhook);export default r;

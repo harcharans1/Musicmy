@@ -1,0 +1,1 @@
+import User from'../models/User.js';export async function chargeCredits(id,cost){const u=await User.findById(id);if(!u||u.credits<cost){const e=new Error('Insufficient credits');e.status=402;throw e}u.credits-=cost;await u.save();return u.credits}

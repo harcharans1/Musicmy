@@ -1,0 +1,1 @@
+export const profile=(req,res)=>res.json({user:req.user});export const history=(req,res)=>res.json({generations:[]});export const favorites=(req,res)=>res.json({favorites:[]});export const usage=(req,res)=>res.json({creditsUsed:0,generations:0});

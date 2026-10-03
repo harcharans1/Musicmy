@@ -1,0 +1,1 @@
+import mongoose from'mongoose';export default mongoose.model('User',new mongoose.Schema({name:{type:String,required:true},email:{type:String,unique:true,lowercase:true},password:String,role:{type:String,default:'user'},plan:{type:String,default:'free'},credits:{type:Number,default:50}},{timestamps:true}))

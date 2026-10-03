@@ -1,0 +1,1 @@
+export const createPayment=(req,res)=>res.status(501).json({message:'Configure Razorpay or Stripe server-side before enabling payments'});export const verifyPayment=(req,res)=>res.status(501).json({message:'Payment verification not configured'});export const webhook=(req,res)=>res.status(501).json({message:'Payment webhook not configured'});

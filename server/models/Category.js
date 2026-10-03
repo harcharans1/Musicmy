@@ -1,0 +1,1 @@
+import mongoose from'mongoose';export default mongoose.model('Category',new mongoose.Schema({userId:{type:mongoose.Schema.Types.ObjectId,ref:'User'},toolId:{type:mongoose.Schema.Types.ObjectId,ref:'Tool'},title:String,content:String,status:String,amount:Number,plan:String,provider:String,transactionId:String,question:String,answer:String,slug:String},{timestamps:true}))

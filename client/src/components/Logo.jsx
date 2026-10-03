@@ -1,0 +1,1 @@
+import {Sparkles} from 'lucide-react';export default function Logo(){return <div className="flex items-center gap-2 font-black"><span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-cyan-400"><Sparkles size={18}/></span>AI<span className="text-violet-400">Forge</span></div>}

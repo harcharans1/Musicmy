@@ -1,0 +1,1 @@
+import mongoose from'mongoose';export default mongoose.model('Tool',new mongoose.Schema({name:String,slug:{type:String,unique:true},description:String,category:String,icon:String,provider:String,creditCost:{type:Number,default:1},isPremium:Boolean,isActive:{type:Boolean,default:true}},{timestamps:true}))
