@@ -4,10 +4,15 @@ import {
   Download,
   Save,
   Sparkles,
+  Check,
 } from "lucide-react";
 import { useParams } from "react-router-dom";
 
-import { aiApi } from "../services/api";
+import {
+  aiApi,
+  savedOutputApi,
+} from "../services/api";
+
 import Button from "../components/Button";
 
 const names = {
@@ -28,12 +33,20 @@ export default function ToolWorkspace() {
   const [input, setInput] = useState("");
   const [out, setOut] = useState("");
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  /* =========================
+     GENERATE
+  ========================= */
 
   const go = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || busy) return;
 
     setBusy(true);
     setOut("");
+    setSaved(false);
 
     try {
       let response;
@@ -54,7 +67,13 @@ export default function ToolWorkspace() {
         if (result?.url) {
           setOut(result.url);
         } else {
-          setOut(JSON.stringify(result, null, 2));
+          setOut(
+            JSON.stringify(
+              result,
+              null,
+              2
+            )
+          );
         }
 
         return;
@@ -121,7 +140,10 @@ export default function ToolWorkspace() {
           ""
       );
     } catch (error) {
-      console.error("AI Tool Error:", error);
+      console.error(
+        "AI Tool Error:",
+        error
+      );
 
       setOut(
         error.response?.data?.message ||
@@ -134,43 +156,106 @@ export default function ToolWorkspace() {
   };
 
   /* =========================
-     COPY
+     COPY OUTPUT
   ========================= */
 
   const copyOutput = async () => {
     if (!out) return;
 
     try {
-      await navigator.clipboard.writeText(out);
+      await navigator.clipboard.writeText(
+        out
+      );
+
+      setCopied(true);
+
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
     } catch (error) {
-      console.error("Copy failed:", error);
+      console.error(
+        "Copy failed:",
+        error
+      );
     }
   };
 
   /* =========================
-     DOWNLOAD
+     SAVE OUTPUT
+  ========================= */
+
+  const saveOutput = async () => {
+    if (!out || saving || saved) return;
+
+    setSaving(true);
+
+    try {
+      await savedOutputApi.save({
+        title: name,
+        content: out,
+      });
+
+      setSaved(true);
+
+      setTimeout(() => {
+        setSaved(false);
+      }, 2500);
+    } catch (error) {
+      console.error(
+        "Save output failed:",
+        error
+      );
+
+      alert(
+        error.response?.data?.message ||
+          "Failed to save output. Please try again."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /* =========================
+     DOWNLOAD OUTPUT
   ========================= */
 
   const downloadOutput = () => {
     if (!out) return;
 
-    const blob = new Blob([out], {
-      type: "text/plain;charset=utf-8",
-    });
+    const blob = new Blob(
+      [out],
+      {
+        type:
+          "text/plain;charset=utf-8",
+      }
+    );
 
-    const url = URL.createObjectURL(blob);
+    const url =
+      URL.createObjectURL(blob);
 
-    const a = document.createElement("a");
+    const a =
+      document.createElement("a");
+
     a.href = url;
-    a.download = `${slug}-result.txt`;
+
+    a.download =
+      `${slug}-result.txt`;
+
+    document.body.appendChild(a);
+
     a.click();
+
+    a.remove();
 
     URL.revokeObjectURL(url);
   };
 
   return (
     <div className="mx-auto max-w-7xl py-8">
-      {/* HEADER */}
+
+      {/* =========================
+          HEADER
+      ========================= */}
 
       <p className="text-xs uppercase tracking-[.2em] text-violet-400">
         AI WORKSPACE
@@ -187,12 +272,29 @@ export default function ToolWorkspace() {
         ========================= */}
 
         <section className="glass rounded-2xl p-5">
+
           <h2 className="font-semibold">
             Input
           </h2>
 
           <textarea
-            className="mt-4 min-h-[330px] w-full resize-none rounded-xl border border-white/10 bg-black/20 p-4 text-sm outline-none"
+            className="
+              mt-4
+              min-h-[330px]
+              w-full
+              resize-none
+              rounded-xl
+              border
+              border-white/10
+              bg-black/20
+              p-4
+              text-sm
+              outline-none
+              transition
+              focus:border-violet-500/50
+              focus:ring-1
+              focus:ring-violet-500/30
+            "
             value={input}
             onChange={(e) =>
               setInput(e.target.value)
@@ -204,17 +306,23 @@ export default function ToolWorkspace() {
             variant="glow"
             className="mt-3 w-full"
             onClick={go}
-            disabled={busy || !input.trim()}
+            disabled={
+              busy ||
+              !input.trim()
+            }
           >
             {busy ? (
               "Generating..."
             ) : (
               <>
                 Generate
-                <Sparkles size={15} />
+                <Sparkles
+                  size={15}
+                />
               </>
             )}
           </Button>
+
         </section>
 
         {/* =========================
@@ -222,48 +330,110 @@ export default function ToolWorkspace() {
         ========================= */}
 
         <section className="glass rounded-2xl p-5">
+
+          {/* OUTPUT HEADER */}
+
           <div className="flex items-center justify-between">
+
             <h2 className="font-semibold">
               Output
             </h2>
 
-            <div className="flex gap-3">
+            <div className="flex items-center gap-3">
+
+              {/* COPY */}
+
               <button
                 onClick={copyOutput}
                 disabled={!out}
-                title="Copy"
-                className="transition hover:text-violet-400 disabled:opacity-30"
+                title={
+                  copied
+                    ? "Copied"
+                    : "Copy"
+                }
+                className="
+                  transition
+                  hover:text-violet-400
+                  disabled:opacity-30
+                "
               >
-                <Copy size={15} />
+                {copied ? (
+                  <Check
+                    size={15}
+                  />
+                ) : (
+                  <Copy
+                    size={15}
+                  />
+                )}
               </button>
 
+              {/* SAVE */}
+
               <button
-                onClick={() =>
-                  console.log(
-                    "Save output:",
-                    out
-                  )
+                onClick={saveOutput}
+                disabled={
+                  !out ||
+                  saving ||
+                  saved
+                }
+                title={
+                  saved
+                    ? "Saved"
+                    : saving
+                    ? "Saving..."
+                    : "Save"
+                }
+                className="
+                  transition
+                  hover:text-violet-400
+                  disabled:opacity-30
+                "
+              >
+                {saved ? (
+                  <Check
+                    size={15}
+                  />
+                ) : (
+                  <Save
+                    size={15}
+                  />
+                )}
+              </button>
+
+              {/* DOWNLOAD */}
+
+              <button
+                onClick={
+                  downloadOutput
                 }
                 disabled={!out}
-                title="Save"
-                className="transition hover:text-violet-400 disabled:opacity-30"
+                title="Download"
+                className="
+                  transition
+                  hover:text-violet-400
+                  disabled:opacity-30
+                "
               >
-                <Save size={15} />
+                <Download
+                  size={15}
+                />
               </button>
 
-              <button
-                onClick={downloadOutput}
-                disabled={!out}
-                title="Download"
-                className="transition hover:text-violet-400 disabled:opacity-30"
-              >
-                <Download size={15} />
-              </button>
             </div>
           </div>
 
+          {/* SAVE SUCCESS */}
+
+          {saved && (
+            <div className="mt-3 flex items-center gap-2 text-xs text-green-400">
+              <Check size={13} />
+              Output saved successfully
+            </div>
+          )}
+
           {/* =========================
-              SCROLLABLE OUTPUT BOX
+              OUTPUT BOX
           ========================= */}
 
           <div
@@ -289,22 +459,30 @@ export default function ToolWorkspace() {
             "
           >
             {out ? (
-              slug === "ai-image-generator" &&
+              slug ===
+                "ai-image-generator" &&
               out.startsWith("http") ? (
                 <img
                   src={out}
                   alt="Generated AI"
-                  className="max-h-[450px] w-full rounded-xl object-contain"
+                  className="
+                    max-h-[450px]
+                    w-full
+                    rounded-xl
+                    object-contain
+                  "
                 />
               ) : (
                 out
               )
             ) : (
               <span className="text-slate-700">
-                Your generated result will appear here.
+                Your generated result
+                will appear here.
               </span>
             )}
           </div>
+
         </section>
       </div>
     </div>

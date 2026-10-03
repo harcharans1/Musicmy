@@ -11,6 +11,7 @@ import ai from "./routes/ai.js";
 import user from "./routes/user.js";
 import payment from "./routes/payment.js";
 import admin from "./routes/admin.js";
+import savedOutputs from "./routes/savedOutputs.js";
 import { notFound, errorHandler } from "./middleware/error.js";
 
 const app = express();
@@ -103,7 +104,7 @@ app.use("/api/ai", ai);
 app.use("/api/user", user);
 app.use("/api/payment", payment);
 app.use("/api/admin", admin);
-
+app.use("/api/saved-outputs", savedOutputs);
 /* =========================
    ERROR HANDLING
 ========================= */

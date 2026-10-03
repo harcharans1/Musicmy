@@ -71,3 +71,17 @@ export const aiApi = {
   translate: (data) =>
     api.post("/ai/translate", data),
 };
+/* =========================
+   SAVED OUTPUTS API
+========================= */
+
+export const savedOutputApi = {
+  save: (data) =>
+    api.post("/saved-outputs", data),
+
+  list: () =>
+    api.get("/saved-outputs"),
+
+  delete: (id) =>
+    api.delete(`/saved-outputs/${id}`),
+};
