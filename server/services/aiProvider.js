@@ -1,41 +1,73 @@
-export class DemoProvider {
+import { GoogleGenAI } from "@google/genai";
+
+class GeminiProvider {
   constructor() {
-    this.name = "demo";
+    this.name = "gemini";
+
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY is missing");
+    }
+
+    this.client = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+    });
   }
 
   async generate({ prompt, type }) {
-    return `Demo AI response.
+    const response = await this.client.models.generateContent({
+      model: "gemini-3.8-flash",
+      contents: `
+You are an AI assistant inside AIForge.
 
-Type: ${type || "text"}
+Task type: ${type || "text"}
 
-Prompt:
+User request:
 ${prompt}
 
-DEMO_MODE is enabled. Configure an AI provider to connect a live AI model.`;
+Give a clear, useful and professional answer.
+      `,
+    });
+
+    return response.text;
+  }
+
+  async summarize({ text }) {
+    const response = await this.client.models.generateContent({
+      model: "gemini-3.8-flash",
+      contents: `
+Summarize the following text clearly.
+
+Text:
+${text}
+      `,
+    });
+
+    return response.text;
+  }
+
+  async translate({ text, language }) {
+    const response = await this.client.models.generateContent({
+      model: "gemini-3.8-flash",
+      contents: `
+Translate the following text into ${language}.
+
+Text:
+${text}
+      `,
+    });
+
+    return response.text;
   }
 
   async image({ prompt }) {
     return {
-      url: "https://placehold.co/1024x1024/11131b/8b5cf6?text=AIForge+Demo",
+      url: "https://placehold.co/1024x1024/11131b/8b5cf6?text=AIForge",
       prompt,
+      message: "Image generation provider will be connected separately.",
     };
-  }
-
-  async summarize({ text }) {
-    return `Demo summary:
-
-${text.slice(0, 700)}
-
-[Generated in demo mode]`;
-  }
-
-  async translate({ text, language }) {
-    return `[Demo ${language || "English"} translation]
-
-${text}`;
   }
 }
 
 export function getAIProvider() {
-  return new DemoProvider();
+  return new GeminiProvider();
 }
