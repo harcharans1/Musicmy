@@ -121,13 +121,30 @@ export const History = () => {
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [favoriteIds, setFavoriteIds] = useState(new Set());
+  const [favoriteBusy, setFavoriteBusy] = useState(null);
 
   const loadHistory = async () => {
     setLoading(true);
     setError("");
     try {
-      const response = await userApi.history();
-      setItems(response.data?.generations || []);
+      const [historyResponse, favoritesResponse] = await Promise.all([
+        userApi.history(),
+        userApi.favorites(),
+      ]);
+
+      const historyItems = historyResponse.data?.generations || [];
+      const favoriteRows = favoritesResponse.data?.favorites || [];
+
+      setItems(historyItems);
+      setFavoriteIds(
+        new Set(
+          favoriteRows
+            .map((item) => getFavoriteGenerationId(item))
+            .filter(Boolean)
+            .map(String)
+        )
+      );
     } catch (err) {
       console.error("History load error:", err);
       setError(
@@ -170,6 +187,26 @@ export const History = () => {
     }
   };
 
+  const removeFavorite = async (favoriteId) => {
+    if (!favoriteId) return;
+
+    setRemoving(favoriteId);
+
+    try {
+      await userApi.removeFavorite(favoriteId);
+      setFavorites((current) =>
+        current.filter((item) => item.favorite_id !== favoriteId)
+      );
+    } catch (err) {
+      console.error("Remove favorite error:", err);
+      alert(
+        err.response?.data?.message || "Failed to remove favorite."
+      );
+    } finally {
+      setRemoving(null);
+    }
+  };
+
   const downloadItem = (item) => {
     const content = getContent(item);
     if (!content) return;
@@ -186,6 +223,49 @@ export const History = () => {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
+  };
+
+  const toggleFavorite = async (item) => {
+    const generationId = item?.id;
+    if (!generationId) return;
+
+    setFavoriteBusy(generationId);
+
+    try {
+      if (favoriteIds.has(String(generationId))) {
+        const favoritesResponse = await userApi.favorites();
+        const favoriteRows = favoritesResponse.data?.favorites || [];
+        const favorite = favoriteRows.find(
+          (row) =>
+            String(getFavoriteGenerationId(row)) === String(generationId)
+        );
+
+        if (favorite?.id) {
+          await userApi.removeFavorite(favorite.id);
+        }
+
+        setFavoriteIds((current) => {
+          const next = new Set(current);
+          next.delete(String(generationId));
+          return next;
+        });
+      } else {
+        await userApi.addFavorite(generationId);
+
+        setFavoriteIds((current) => {
+          const next = new Set(current);
+          next.add(String(generationId));
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error("Favorite toggle error:", err);
+      alert(
+        err.response?.data?.message || "Failed to update favorite."
+      );
+    } finally {
+      setFavoriteBusy(null);
+    }
   };
 
   const deleteItem = async (id) => {
@@ -288,6 +368,31 @@ export const History = () => {
 
                   <div className="flex items-center gap-2">
                     <button
+                      onClick={() => toggleFavorite(item)}
+                      disabled={favoriteBusy === item.id}
+                      title={
+                        favoriteIds.has(String(item.id))
+                          ? "Remove from favorites"
+                          : "Add to favorites"
+                      }
+                      className={
+                        "rounded-lg border p-2 transition " +
+                        (favoriteIds.has(String(item.id))
+                          ? "border-pink-500/20 bg-pink-500/10 text-pink-400"
+                          : "border-white/10 text-slate-400 hover:bg-white/5 hover:text-pink-300")
+                      }
+                    >
+                      <Heart
+                        size={16}
+                        className={
+                          favoriteIds.has(String(item.id))
+                            ? "fill-current"
+                            : ""
+                        }
+                      />
+                    </button>
+
+                    <button
                       onClick={() => setSelected(item)}
                       title="View"
                       className="rounded-lg border border-white/10 p-2 text-slate-400 hover:bg-white/5 hover:text-violet-300"
@@ -388,6 +493,7 @@ export const Favorites = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(null);
+  const [removing, setRemoving] = useState(null);
 
   const loadFavorites = async () => {
     setLoading(true);
@@ -553,6 +659,15 @@ export const Favorites = () => {
                         className="rounded-lg border border-white/10 p-2 text-slate-400 hover:bg-white/5 hover:text-violet-300 disabled:opacity-30"
                       >
                         <Download size={16} />
+                      </button>
+
+                      <button
+                        onClick={() => removeFavorite(item.favorite_id)}
+                        disabled={removing === item.favorite_id}
+                        title="Remove from favorites"
+                        className="rounded-lg border border-red-500/10 p-2 text-slate-400 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-30"
+                      >
+                        <Heart size={16} className="fill-current" />
                       </button>
                     </div>
                   )}
