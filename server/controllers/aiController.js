@@ -5,7 +5,6 @@ import { getAIProvider } from "../services/aiProvider.js";
 const getCost = (type) => {
   if (type === "image") return 10;
   if (type === "pdf") return 5;
-
   return 1;
 };
 
@@ -29,24 +28,75 @@ async function saveGeneration({
       user_id: userId,
       tool_id: toolId,
       title,
-      content,
+      content:
+        typeof content === "string"
+          ? content
+          : JSON.stringify(content),
       status,
       amount,
       plan,
       provider,
       transaction_id: transactionId,
       question,
-      answer,
+      answer:
+        typeof answer === "string"
+          ? answer
+          : JSON.stringify(answer),
       slug,
     })
     .select("*")
     .single();
 
-  if (error) {
-    throw error;
-  }
+  if (error) throw error;
 
   return data;
+}
+
+async function finishGeneration({
+  req,
+  res,
+  result,
+  cost,
+  title,
+  slug,
+  toolId,
+  prompt,
+  provider,
+}) {
+  const generation = await saveGeneration({
+    userId: req.user.id,
+    toolId,
+    title,
+    content: result,
+    amount: cost,
+    plan: req.user.plan || "free",
+    provider: provider.name || "gemini",
+    question: prompt,
+    answer: result,
+    slug,
+  });
+
+  const remainingCredits = await getRemainingCredits(req.user.id);
+
+  return res.json({
+    success: true,
+    result,
+    credits: remainingCredits,
+    generationId: generation.id,
+    generation,
+  });
+}
+
+async function getRemainingCredits(userId) {
+  const { data, error } = await supabase
+    .from("users")
+    .select("credits")
+    .eq("id", userId)
+    .single();
+
+  if (error) throw error;
+
+  return Number(data?.credits || 0);
 }
 
 export async function generate(req, res) {
@@ -60,17 +110,11 @@ export async function generate(req, res) {
     } = req.body;
 
     if (!prompt) {
-      return res.status(400).json({
-        message: "Prompt is required",
-      });
+      return res.status(400).json({ message: "Prompt is required" });
     }
 
     const cost = getCost(type);
-
-    const remainingCredits = await chargeCredits(
-      req.user.id,
-      cost
-    );
+    await chargeCredits(req.user.id, cost);
 
     const provider = getAIProvider();
 
@@ -80,28 +124,20 @@ export async function generate(req, res) {
       user: req.user,
     });
 
-    await saveGeneration({
-      userId: req.user.id,
-      toolId,
-      title,
-      content: result,
-      amount: cost,
-      plan: req.user.plan || "free",
-      provider: provider.name || "demo",
-      question: prompt,
-      answer: result,
-      slug,
-    });
-
-    res.json({
-      success: true,
+    return finishGeneration({
+      req,
+      res,
       result,
-      credits: remainingCredits,
+      cost,
+      title,
+      slug,
+      toolId,
+      prompt,
+      provider,
     });
   } catch (error) {
     console.error("AI generate error:", error);
-
-    res.status(error.status || 500).json({
+    return res.status(error.status || 500).json({
       message: error.message || "AI generation failed",
     });
   }
@@ -123,11 +159,7 @@ export async function image(req, res) {
     }
 
     const cost = 10;
-
-    const remainingCredits = await chargeCredits(
-      req.user.id,
-      cost
-    );
+    await chargeCredits(req.user.id, cost);
 
     const provider = getAIProvider();
 
@@ -136,28 +168,20 @@ export async function image(req, res) {
       user: req.user,
     });
 
-    await saveGeneration({
-      userId: req.user.id,
-      toolId,
-      title,
-      content: result,
-      amount: cost,
-      plan: req.user.plan || "free",
-      provider: provider.name || "demo",
-      question: prompt,
-      answer: result,
-      slug,
-    });
-
-    res.json({
-      success: true,
+    return finishGeneration({
+      req,
+      res,
       result,
-      credits: remainingCredits,
+      cost,
+      title,
+      slug,
+      toolId,
+      prompt,
+      provider,
     });
   } catch (error) {
     console.error("AI image error:", error);
-
-    res.status(error.status || 500).json({
+    return res.status(error.status || 500).json({
       message: error.message || "Image generation failed",
     });
   }
@@ -173,17 +197,11 @@ export async function summarize(req, res) {
     } = req.body;
 
     if (!text) {
-      return res.status(400).json({
-        message: "Text is required",
-      });
+      return res.status(400).json({ message: "Text is required" });
     }
 
     const cost = 1;
-
-    const remainingCredits = await chargeCredits(
-      req.user.id,
-      cost
-    );
+    await chargeCredits(req.user.id, cost);
 
     const provider = getAIProvider();
 
@@ -192,28 +210,20 @@ export async function summarize(req, res) {
       user: req.user,
     });
 
-    await saveGeneration({
-      userId: req.user.id,
-      toolId,
-      title,
-      content: result,
-      amount: cost,
-      plan: req.user.plan || "free",
-      provider: provider.name || "demo",
-      question: text,
-      answer: result,
-      slug,
-    });
-
-    res.json({
-      success: true,
+    return finishGeneration({
+      req,
+      res,
       result,
-      credits: remainingCredits,
+      cost,
+      title,
+      slug,
+      toolId,
+      prompt: text,
+      provider,
     });
   } catch (error) {
     console.error("AI summarize error:", error);
-
-    res.status(error.status || 500).json({
+    return res.status(error.status || 500).json({
       message: error.message || "Summarization failed",
     });
   }
@@ -236,11 +246,7 @@ export async function translate(req, res) {
     }
 
     const cost = 1;
-
-    const remainingCredits = await chargeCredits(
-      req.user.id,
-      cost
-    );
+    await chargeCredits(req.user.id, cost);
 
     const provider = getAIProvider();
 
@@ -250,28 +256,20 @@ export async function translate(req, res) {
       user: req.user,
     });
 
-    await saveGeneration({
-      userId: req.user.id,
-      toolId,
-      title,
-      content: result,
-      amount: cost,
-      plan: req.user.plan || "free",
-      provider: provider.name || "demo",
-      question: text,
-      answer: result,
-      slug,
-    });
-
-    res.json({
-      success: true,
+    return finishGeneration({
+      req,
+      res,
       result,
-      credits: remainingCredits,
+      cost,
+      title,
+      slug,
+      toolId,
+      prompt: text,
+      provider,
     });
   } catch (error) {
     console.error("AI translate error:", error);
-
-    res.status(error.status || 500).json({
+    return res.status(error.status || 500).json({
       message: error.message || "Translation failed",
     });
   }

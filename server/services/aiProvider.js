@@ -2,9 +2,9 @@ import { GoogleGenAI } from "@google/genai";
 
 const MODEL_PRIMARY = "gemini-3.8-flash";
 const MODEL_FALLBACK = "gemini-3.7-flash";
+const IMAGE_MODEL = "gemini-3.1-flash-image";
 
-const sleep = (ms) =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function isRetryableError(error) {
   const message = String(error?.message || error || "").toLowerCase();
@@ -41,14 +41,9 @@ async function generateWithRetry(client, model, contents) {
         throw error;
       }
 
-      const delay = Math.min(
-        1000 * 2 ** attempt + Math.random() * 500,
-        8000
+      await sleep(
+        Math.min(1000 * 2 ** attempt + Math.random() * 500, 8000)
       );
-
-      console.log(`Retrying Gemini in ${Math.round(delay)}ms...`);
-
-      await sleep(delay);
     }
   }
 
@@ -82,8 +77,6 @@ class GeminiProvider {
       );
 
       try {
-        console.log(`Trying fallback model: ${MODEL_FALLBACK}`);
-
         return await generateWithRetry(
           this.client,
           MODEL_FALLBACK,
@@ -134,12 +127,26 @@ ${text}
   }
 
   async image({ prompt }) {
+    const interaction = await this.client.interactions.create({
+      model: IMAGE_MODEL,
+      input: prompt,
+      response_format: {
+        type: "image",
+        mime_type: "image/png",
+        aspect_ratio: "1:1",
+        image_size: "1K",
+      },
+    });
+
+    const image = interaction.output_image;
+
+    if (!image?.data) {
+      throw new Error("Gemini did not return an image.");
+    }
+
     return {
-      url:
-        "https://placehold.co/1024x1024/11131b/8b5cf6?text=AIForge",
+      url: `data:${image.mime_type || "image/png"};base64,${image.data}`,
       prompt,
-      message:
-        "Image generation provider will be connected separately.",
     };
   }
 }
