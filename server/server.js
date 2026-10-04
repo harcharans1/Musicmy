@@ -5,26 +5,18 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 
 import { connectDB } from "./config/db.js";
-import auth from "./routes/auth.js";
-import tools from "./routes/tools.js";
-import ai from "./routes/ai.js";
-import user from "./routes/user.js";
-import payment from "./routes/payment.js";
-import admin from "./routes/admin.js";
-import savedOutputs from "./routes/savedOutputs.js";
-import { notFound, errorHandler } from "./middleware/error.js";
+
+import authRoutes from "./routes/auth.js";
+import toolRoutes from "./routes/tools.js";
+import aiRoutes from "./routes/ai.js";
+import userRoutes from "./routes/user.js";
+import paymentRoutes from "./routes/payment.js";
+import adminRoutes from "./routes/admin.js";
+import savedOutputRoutes from "./routes/savedOutputs.js";
 
 const app = express();
 
-/* =========================
-   SECURITY
-========================= */
-
 app.use(helmet());
-
-/* =========================
-   CORS
-========================= */
 
 const allowedOrigins = [
   "https://musicmyy.netlify.app",
@@ -33,98 +25,71 @@ const allowedOrigins = [
 
 app.use(
   cors({
-    origin: function (origin, callback) {
-      if (!origin) {
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
 
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error("Not allowed by CORS"));
+      return callback(
+        new Error("Not allowed by CORS")
+      );
     },
     credentials: false,
-    methods: [
-      "GET",
-      "POST",
-      "PUT",
-      "PATCH",
-      "DELETE",
-      "OPTIONS",
-    ],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-    ],
   })
 );
-
-/* =========================
-   BODY PARSER
-========================= */
 
 app.use(
   express.json({
     limit: "2mb",
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    },
   })
 );
-
-/* =========================
-   RATE LIMIT
-========================= */
 
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 300,
+    limit: 300,
     standardHeaders: true,
     legacyHeaders: false,
   })
 );
 
-/* =========================
-   HEALTH CHECK
-========================= */
-
 app.get("/api/health", (req, res) => {
   res.json({
-    status: "ok",
-    demoMode: process.env.DEMO_MODE === "true",
+    success: true,
+    message: "AIForge API is running",
   });
 });
 
-/* =========================
-   API ROUTES
-========================= */
+app.use("/api/auth", authRoutes);
+app.use("/api/tools", toolRoutes);
+app.use("/api/ai", aiRoutes);
+app.use("/api/user", userRoutes);
+app.use("/api/payment", paymentRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/saved-outputs", savedOutputRoutes);
 
-app.use("/api/auth", auth);
-app.use("/api/tools", tools);
-app.use("/api/ai", ai);
-app.use("/api/user", user);
-app.use("/api/payment", payment);
-app.use("/api/admin", admin);
-app.use("/api/saved-outputs", savedOutputs);
-/* =========================
-   ERROR HANDLING
-========================= */
+app.use((err, req, res, next) => {
+  console.error(err);
 
-app.use(notFound);
-app.use(errorHandler);
+  res.status(err.status || 500).json({
+    success: false,
+    message:
+      err.message || "Internal server error.",
+  });
+});
 
-/* =========================
-   START SERVER
-========================= */
+const PORT = process.env.PORT || 5000;
 
 connectDB()
   .then(() => {
-    const PORT = process.env.PORT || 5000;
-
     app.listen(PORT, () => {
-      console.log(`AIForge API running on port ${PORT}`);
+      console.log(`AIForge server running on port ${PORT}`);
     });
   })
   .catch((error) => {
-    console.error("Server startup failed:", error);
+    console.error("Database connection failed:", error);
     process.exit(1);
   });

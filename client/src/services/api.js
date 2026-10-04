@@ -7,7 +7,11 @@ export const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("aiforge_token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
   return config;
 });
 
@@ -16,10 +20,8 @@ export const authApi = {
   login: (data) => api.post("/auth/login", data),
   me: () => api.get("/auth/me"),
   logout: () => api.post("/auth/logout"),
-
   forgotPassword: (email) =>
     api.post("/auth/forgot-password", { email }),
-
   resetPassword: (data) =>
     api.post("/auth/reset-password", data),
 };
@@ -42,7 +44,8 @@ export const userApi = {
   history: () => api.get("/user/history"),
   deleteHistory: (id) => api.delete(`/user/history/${id}`),
   favorites: () => api.get("/user/favorites"),
-  addFavorite: (generationId) => api.post("/user/favorites", { generationId }),
+  addFavorite: (generationId) =>
+    api.post("/user/favorites", { generationId }),
   removeFavorite: (id) => api.delete(`/user/favorites/${id}`),
   usage: () => api.get("/user/usage"),
 };
@@ -51,4 +54,9 @@ export const savedOutputApi = {
   save: (data) => api.post("/saved-outputs", data),
   list: () => api.get("/saved-outputs"),
   delete: (id) => api.delete(`/saved-outputs/${id}`),
+};
+
+export const paymentApi = {
+  createSubscription: () => api.post("/payment/create"),
+  verifySubscription: (data) => api.post("/payment/verify", data),
 };

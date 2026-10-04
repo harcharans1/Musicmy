@@ -1,1 +1,15 @@
-import{Router}from'express';import{protect}from'../middleware/auth.js';import{createPayment,verifyPayment,webhook}from'../controllers/paymentController.js';const r=Router();r.post('/create',protect,createPayment);r.post('/verify',protect,verifyPayment);r.post('/webhook',webhook);export default r;
+import { Router } from "express";
+import {
+  createPayment,
+  verifyPayment,
+  webhook,
+} from "../controllers/paymentController.js";
+import { protect } from "../middleware/auth.js";
+
+const router = Router();
+
+router.post("/create", protect, createPayment);
+router.post("/verify", protect, verifyPayment);
+router.post("/webhook", webhook);
+
+export default router;
