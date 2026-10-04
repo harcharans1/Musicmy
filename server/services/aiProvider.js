@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 const MODEL = "gemini-3.5-flash-lite";
+const IMAGE_MODEL = "gemini-3.1-flash-image";
 
 const sleep = (ms) =>
   new Promise((resolve) => setTimeout(resolve, ms));
@@ -22,7 +23,6 @@ function cleanResult(value) {
 
   let result = value.trim();
 
-  // Remove accidental reasoning blocks if a model returns them.
   result = result.replace(
     /<think>[\s\S]*?<\/think>/gi,
     ""
@@ -43,7 +43,7 @@ function cleanResult(value) {
 
 /*
 |--------------------------------------------------------------------------
-| Gemini Request
+| Gemini Text Request
 |--------------------------------------------------------------------------
 */
 
@@ -56,18 +56,22 @@ async function callGemini(instructions, input) {
     attempt++
   ) {
     try {
-      const response = await ai.models.generateContent({
-        model: MODEL,
+      const response =
+        await ai.models.generateContent({
+          model: MODEL,
 
-        contents: input,
+          contents: input,
 
-        config: {
-          systemInstruction: instructions,
-          maxOutputTokens: 1400,
-        },
-      });
+          config: {
+            systemInstruction:
+              instructions,
+            maxOutputTokens: 1400,
+          },
+        });
 
-      const result = cleanResult(response?.text);
+      const result = cleanResult(
+        response?.text
+      );
 
       if (result) {
         return result;
@@ -78,7 +82,9 @@ async function callGemini(instructions, input) {
       );
     } catch (error) {
       console.error(
-        `Gemini attempt ${attempt + 1} failed:`,
+        `Gemini attempt ${
+          attempt + 1
+        } failed:`,
         error?.message || error
       );
 
@@ -88,7 +94,8 @@ async function callGemini(instructions, input) {
         error?.response?.status;
 
       /*
-       * Retry temporary errors and rate limits.
+       * Retry temporary errors
+       * and rate limits.
        */
       if (
         attempt < maxRetries &&
@@ -100,7 +107,10 @@ async function callGemini(instructions, input) {
           status === 504
         )
       ) {
-        await sleep(1500 * (attempt + 1));
+        await sleep(
+          1500 * (attempt + 1)
+        );
+
         continue;
       }
 
@@ -270,9 +280,11 @@ Preserve the original meaning.
 `,
 
   "ai-image-enhancer": `
-Image enhancement is not currently available through this text provider.
+Image enhancement requires an image input.
 
-Return a concise message explaining that image enhancement is not enabled yet.
+Do not pretend that an image was enhanced.
+
+If no image is provided, explain that an image upload is required.
 `,
 };
 
@@ -294,7 +306,7 @@ class GeminiProvider {
   }
 
   /*
-   * Generic request
+   * Generic text request
    */
   async run(instructions, input) {
     return callGemini(
@@ -390,14 +402,71 @@ ${text}`
   }
 
   /*
-   * Image Generation
-   *
-   * Not enabled in this text provider.
-   */
-  async image() {
-    throw new Error(
-      "Image generation is not available through the current Gemini text provider."
-    );
+  |--------------------------------------------------------------------------
+  | IMAGE GENERATOR
+  |--------------------------------------------------------------------------
+  */
+
+  async image({
+    prompt,
+  }) {
+    if (
+      !prompt ||
+      !String(prompt).trim()
+    ) {
+      throw new Error(
+        "Image prompt is required."
+      );
+    }
+
+    try {
+      const interaction =
+        await ai.interactions.create({
+          model: IMAGE_MODEL,
+
+          input:
+            String(prompt).trim(),
+
+          response_format: {
+            type: "image",
+            mime_type: "image/png",
+            aspect_ratio: "1:1",
+            image_size: "1K",
+          },
+        });
+
+      const generatedImage =
+        interaction?.output_image;
+
+      if (
+        !generatedImage ||
+        !generatedImage.data
+      ) {
+        throw new Error(
+          "Gemini did not return a generated image."
+        );
+      }
+
+      const mimeType =
+        generatedImage.mime_type ||
+        "image/png";
+
+      /*
+       * Return browser-ready
+       * data URL.
+       */
+      return `data:${mimeType};base64,${generatedImage.data}`;
+    } catch (error) {
+      console.error(
+        "Gemini image generation error:",
+        error?.message || error
+      );
+
+      throw new Error(
+        error?.message ||
+        "Image generation failed. Please try again."
+      );
+    }
   }
 }
 
