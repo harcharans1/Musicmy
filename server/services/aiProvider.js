@@ -1,18 +1,14 @@
 const OPENROUTER_URL =
   "https://openrouter.ai/api/v1/chat/completions";
 
-/*
- * Free Qwen model.
- * Designed for clean final answers without visible thinking traces.
- */
 const FREE_MODEL =
-  "qwen/qwen3-next-80b-a3b-instruct:free";
+  "nvidia/nemotron-3.5-lightning:free";
 
 const sleep = (ms) =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
 /*
- * Clean unwanted reasoning / thinking text
+ * Remove visible reasoning / thinking from AI response.
  */
 function cleanResult(value) {
   if (typeof value !== "string") {
@@ -21,26 +17,25 @@ function cleanResult(value) {
 
   let result = value.trim();
 
-  /*
-   * Remove <think>...</think> blocks if any model/provider
-   * accidentally returns them.
-   */
+  // Remove <think>...</think>
   result = result.replace(
     /<think>[\s\S]*?<\/think>/gi,
     ""
   );
 
-  /*
-   * Remove standalone reasoning tags.
-   */
+  // Remove <thinking>...</thinking>
   result = result.replace(
     /<thinking>[\s\S]*?<\/thinking>/gi,
     ""
   );
 
-  /*
-   * Remove common final-answer wrapper tags.
-   */
+  // Remove <analysis>...</analysis>
+  result = result.replace(
+    /<analysis>[\s\S]*?<\/analysis>/gi,
+    ""
+  );
+
+  // Remove common final tags
   result = result.replace(
     /<\/?final>/gi,
     ""
@@ -50,10 +45,11 @@ function cleanResult(value) {
 }
 
 /*
- * Extract AI response safely from OpenRouter response.
+ * Extract response from OpenRouter.
  */
 function extractResult(data) {
-  const message = data?.choices?.[0]?.message;
+  const message =
+    data?.choices?.[0]?.message;
 
   if (!message) {
     return "";
@@ -62,7 +58,7 @@ function extractResult(data) {
   let result = message.content;
 
   /*
-   * Some providers can return content as an array.
+   * Some models can return content as array.
    */
   if (Array.isArray(result)) {
     result = result
@@ -84,10 +80,11 @@ function extractResult(data) {
 }
 
 /*
- * Call OpenRouter
+ * OpenRouter request
  */
 async function callOpenRouter(prompt) {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey =
+    process.env.OPENROUTER_API_KEY;
 
   if (!apiKey) {
     throw new Error(
@@ -126,17 +123,28 @@ async function callOpenRouter(prompt) {
               {
                 role: "system",
                 content: `
-You are AIForge's professional AI assistant.
+You are AIForge AI assistant.
 
-IMPORTANT OUTPUT RULES:
-- Return ONLY the final answer.
-- Never reveal your reasoning.
-- Never reveal your analysis.
-- Never output a thinking process.
-- Never output <think> or <thinking> blocks.
-- Never explain how you generated the answer unless explicitly asked.
-- Follow the user's requested format exactly.
-- Keep answers clear, useful and professional.
+IMPORTANT:
+Return ONLY the final answer.
+
+Never show:
+- reasoning
+- analysis
+- thinking process
+- internal thoughts
+- planning
+- <think> tags
+- <thinking> tags
+- <analysis> tags
+
+Never say:
+"Here is my thinking"
+"Thinking process"
+"Let's analyze"
+"Reasoning"
+
+Give only the useful final response.
                 `.trim(),
               },
 
@@ -146,14 +154,24 @@ IMPORTANT OUTPUT RULES:
               },
             ],
 
-            temperature: 0.4,
+            temperature: 0.3,
 
             max_tokens: 1000,
+
+            /*
+             * Ask OpenRouter to exclude reasoning
+             * when supported by the model/provider.
+             */
+            reasoning: {
+              effort: "low",
+              exclude: true,
+            },
           }),
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       console.log(
         "OpenRouter status:",
@@ -171,7 +189,7 @@ IMPORTANT OUTPUT RULES:
           `OpenRouter request failed with status ${response.status}`;
 
         /*
-         * Retry rate-limit and server errors.
+         * Retry rate-limit/server errors.
          */
         if (
           (
@@ -190,20 +208,15 @@ IMPORTANT OUTPUT RULES:
         throw new Error(message);
       }
 
-      /*
-       * Extract response.
-       */
-      const result = extractResult(data);
+      const result =
+        extractResult(data);
 
-      /*
-       * Make sure response is not empty.
-       */
       if (result.length > 0) {
         return result;
       }
 
       console.error(
-        "OpenRouter returned unexpected response:",
+        "OpenRouter returned empty response:",
         JSON.stringify(data)
       );
 
@@ -218,9 +231,6 @@ IMPORTANT OUTPUT RULES:
         error?.message || error
       );
 
-      /*
-       * Retry failed request.
-       */
       if (attempt >= maxRetries) {
         throw error;
       }
@@ -242,7 +252,8 @@ IMPORTANT OUTPUT RULES:
  */
 class OpenRouterProvider {
   constructor() {
-    this.name = "openrouter-free";
+    this.name =
+      "openrouter-free";
 
     if (!process.env.OPENROUTER_API_KEY) {
       throw new Error(
@@ -251,9 +262,7 @@ class OpenRouterProvider {
     }
   }
 
-  /*
-   * Generic AI request
-   */
+
   async run(prompt) {
     return callOpenRouter(prompt);
   }
@@ -262,28 +271,30 @@ class OpenRouterProvider {
   /*
    * AI Writer
    */
-  async generate({ prompt, type }) {
+  async generate({
+    prompt,
+    type,
+  }) {
     return this.run(`
-You are an AI writing assistant inside AIForge.
-
 Task type:
 ${type || "text"}
 
 User request:
 ${prompt}
 
-STRICT OUTPUT RULES:
-- Return ONLY the final answer.
-- Do NOT show reasoning.
-- Do NOT show analysis.
-- Do NOT show your thinking process.
-- Do NOT explain what you are doing.
-- Do NOT write "Here is my thinking".
-- Do NOT write "Thinking process".
-- Do NOT use <think> tags.
-- Do NOT add unnecessary commentary.
+STRICT RULES:
+Return ONLY the final answer.
 
-Give the best useful and professional final answer.
+Do not show:
+- reasoning
+- analysis
+- thinking
+- planning
+- internal thoughts
+
+Do not explain how you generated the answer.
+
+Give a clear, useful and professional final response.
     `.trim());
   }
 
@@ -291,21 +302,23 @@ Give the best useful and professional final answer.
   /*
    * AI Summarizer
    */
-  async summarize({ text }) {
+  async summarize({
+    text,
+  }) {
     return this.run(`
-You are a professional AI summarization tool inside AIForge.
+You are a professional summarization engine.
 
 Summarize the following text.
 
-STRICT OUTPUT RULES:
+STRICT RULES:
 - Return ONLY the final summary.
 - Do NOT show reasoning.
 - Do NOT show analysis.
-- Do NOT explain your process.
-- Do NOT add "Here is the summary".
-- Do NOT use <think> tags.
-- Keep the summary concise.
-- Keep only the important information.
+- Do NOT show thinking.
+- Do NOT explain the process.
+- Do NOT add unnecessary commentary.
+- Keep the important information.
+- Keep it concise.
 - Preserve the original meaning.
 
 Text:
@@ -317,38 +330,43 @@ ${text}
   /*
    * AI Translator
    */
-  async translate({ text, language }) {
+  async translate({
+    text,
+    language,
+  }) {
     return this.run(`
-You are a professional translation engine inside AIForge.
+You are a professional translation engine.
 
-Translate the following text into:
+Translate the text below into:
 
 TARGET LANGUAGE:
 ${language}
 
-STRICT OUTPUT RULES:
+STRICT RULES:
 - Return ONLY the translated text.
 - Do NOT explain anything.
 - Do NOT show reasoning.
 - Do NOT show analysis.
+- Do NOT show thinking.
 - Do NOT describe the translation.
-- Do NOT add notes.
-- Do NOT add quotation marks unless they are part of the original text.
-- Do NOT write "Here is the translation".
 - Do NOT write "Translation:".
-- Do NOT use <think> tags.
+- Do NOT write "Here is the translation".
+- Do NOT add notes.
+- Do NOT add commentary.
+- Do NOT use markdown.
 - Preserve the original meaning.
 - Use natural and grammatically correct ${language}.
 
-TEXT TO TRANSLATE:
+TEXT:
 ${text}
     `.trim());
   }
 
 
   /*
-   * Image generation is currently unavailable
-   * with this free text-only provider.
+   * Image generation
+   *
+   * Current free provider is text-only.
    */
   async image() {
     throw new Error(
