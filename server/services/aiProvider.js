@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 
-const MODEL = "gemini-2.5-flash-lite";
+const MODEL = "gemini-3.5-flash-lite";
 
 const sleep = (ms) =>
   new Promise((resolve) => setTimeout(resolve, ms));
@@ -63,7 +63,6 @@ async function callGemini(instructions, input) {
 
         config: {
           systemInstruction: instructions,
-          temperature: 0.7,
           maxOutputTokens: 1400,
         },
       });
