@@ -1,13 +1,14 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
-  Check,
   Copy,
   Download,
   Heart,
   Save,
   Sparkles,
+  Check,
 } from "lucide-react";
 import { useParams } from "react-router-dom";
+
 import { aiApi, savedOutputApi, userApi } from "../services/api";
 import Button from "../components/Button";
 
@@ -20,41 +21,54 @@ const names = {
   "resume-builder": "AI Resume Builder",
 };
 
+const languages = [
+  "English",
+  "Punjabi",
+  "Hindi",
+  "Urdu",
+  "French",
+  "Spanish",
+  "German",
+  "Italian",
+  "Portuguese",
+  "Chinese",
+  "Japanese",
+];
+
 export default function ToolWorkspace() {
   const { slug } = useParams();
-  const name = names[slug] || slug.replaceAll("-", " ");
+
+  const name =
+    names[slug] || slug?.replaceAll("-", " ") || "AI Tool";
 
   const [input, setInput] = useState("");
-  const [out, setOut] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [generationId, setGenerationId] = useState(null);
+  const [output, setOutput] = useState("");
+  const [language, setLanguage] = useState("Punjabi");
+
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [favorite, setFavorite] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [favorite, setFavorite] = useState(false);
   const [error, setError] = useState("");
+  const [generationId, setGenerationId] = useState(null);
 
+  const isTranslator = slug === "ai-translator";
   const isImage = slug === "ai-image-generator";
-  const isSummarizer = slug?.includes("summarizer");
-  const isTranslator = slug?.includes("translator");
 
-  const placeholder = useMemo(() => {
-    if (isImage) return "Describe the image you want to create...";
-    if (isSummarizer) return "Paste the text you want to summarize...";
-    if (isTranslator) return "Enter the text you want to translate...";
-    return "Tell AI exactly what you want to create...";
-  }, [isImage, isSummarizer, isTranslator]);
-
-  const go = async () => {
-    if (!input.trim()) return;
+  const generate = async () => {
+    if (!input.trim()) {
+      setError(
+        isTranslator
+          ? "Please enter some text to translate."
+          : "Please enter a prompt."
+      );
+      return;
+    }
 
     setBusy(true);
     setError("");
-    setOut("");
-    setImageUrl("");
-    setGenerationId(null);
+    setOutput("");
     setSaved(false);
-    setFavorite(false);
 
     try {
       let response;
@@ -65,16 +79,16 @@ export default function ToolWorkspace() {
           slug,
           title: name,
         });
-      } else if (isSummarizer) {
-        response = await aiApi.summarize({
-          text: input.trim(),
-          slug,
-          title: name,
-        });
       } else if (isTranslator) {
         response = await aiApi.translate({
           text: input.trim(),
-          language: "English",
+          language,
+          slug,
+          title: name,
+        });
+      } else if (slug === "ai-summarizer") {
+        response = await aiApi.summarize({
+          text: input.trim(),
           slug,
           title: name,
         });
@@ -87,30 +101,34 @@ export default function ToolWorkspace() {
         });
       }
 
-      const data = response.data || {};
-      const result = data.result;
+      const data = response?.data;
 
-      setGenerationId(data.generationId || data.generation?.id || null);
+      const result = data?.result;
 
-      if (isImage) {
-        const url =
-          typeof result === "string"
-            ? result
-            : result?.url || "";
+      setGenerationId(
+        data?.generationId ||
+          data?.generation?.id ||
+          null
+      );
 
-        setImageUrl(url);
-        setOut(result?.message || "");
+      if (isImage && result?.url) {
+        setOutput(result.url);
       } else {
-        setOut(
+        setOutput(
           typeof result === "string"
             ? result
-            : result?.text || result?.content || ""
+            : JSON.stringify(result, null, 2)
         );
       }
+
+      setSaved(true);
     } catch (err) {
+      console.error("AI tool error:", err);
+
       setError(
-        err.response?.data?.message ||
-          "AI generation failed. Please try again."
+        err?.response?.data?.message ||
+          err?.message ||
+          "Something went wrong. Please try again."
       );
     } finally {
       setBusy(false);
@@ -118,190 +136,296 @@ export default function ToolWorkspace() {
   };
 
   const copyOutput = async () => {
-    const value = isImage ? imageUrl : out;
-    if (!value) return;
+    if (!output) return;
 
-    await navigator.clipboard?.writeText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1200);
+    try {
+      await navigator.clipboard.writeText(output);
+
+      setCopied(true);
+
+      setTimeout(() => {
+        setCopied(false);
+      }, 1500);
+    } catch (err) {
+      console.error("Copy failed:", err);
+    }
   };
 
   const downloadOutput = () => {
-    if (isImage && imageUrl) {
-      const a = document.createElement("a");
-      a.href = imageUrl;
-      a.download = "aiforge-generated-image.png";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+    if (!output) return;
+
+    if (isImage && output.startsWith("data:image")) {
+      const link = document.createElement("a");
+
+      link.href = output;
+      link.download = `${slug || "aiforge"}-image.png`;
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
       return;
     }
 
-    if (!out) return;
+    const blob = new Blob([output], {
+      type: "text/plain;charset=utf-8",
+    });
 
-    const blob = new Blob([out], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${slug || "aiforge-output"}.txt`;
-    a.click();
+
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `${slug || "aiforge"}-output.txt`;
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
     URL.revokeObjectURL(url);
   };
 
   const saveOutput = async () => {
-    const content = isImage ? imageUrl : out;
-    if (!content) return;
+    if (!output) return;
 
     try {
       await savedOutputApi.save({
         title: name,
-        content,
+        content: output,
       });
+
       setSaved(true);
     } catch (err) {
+      console.error("Save output error:", err);
+
       setError(
-        err.response?.data?.message ||
-          "Could not save this output."
+        err?.response?.data?.message ||
+          "Unable to save this output."
       );
     }
   };
 
   const toggleFavorite = async () => {
     if (!generationId) {
-      setError("Generate a result first.");
+      setError(
+        "Generate something first before adding it to favorites."
+      );
       return;
     }
 
     try {
-      if (favorite) {
-        setError("Remove this favorite from History or Favorites.");
-        return;
+      if (!favorite) {
+        await userApi.addFavorite(generationId);
+        setFavorite(true);
       }
-
-      await userApi.addFavorite(generationId);
-      setFavorite(true);
     } catch (err) {
+      console.error("Favorite error:", err);
+
       setError(
-        err.response?.data?.message ||
-          "Could not add this generation to favorites."
+        err?.response?.data?.message ||
+          "Unable to update favorite."
       );
     }
   };
 
   return (
-    <div className="mx-auto max-w-7xl py-8">
-      <p className="text-xs uppercase tracking-[.2em] text-violet-400">
-        AI WORKSPACE
-      </p>
+    <div className="min-h-screen bg-[#08090d] text-white">
+      <div className="mx-auto max-w-7xl px-5 py-10">
+        {/* Header */}
+        <div className="mb-8 flex items-end justify-between gap-4">
+          <div>
+            <p className="mb-2 text-sm font-medium uppercase tracking-[0.25em] text-violet-400">
+              AI Workspace
+            </p>
 
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-3xl font-black capitalize">{name}</h1>
+            <h1 className="text-4xl font-bold capitalize">
+              {name}
+            </h1>
+          </div>
 
-        {generationId && (
-          <span className="rounded-full border border-emerald-500/20 bg-emerald-500/5 px-3 py-1 text-xs text-emerald-300">
-            Generation saved
-          </span>
-        )}
-      </div>
-
-      {error && (
-        <div className="mt-5 rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-300">
-          {error}
+          {saved && output && (
+            <div className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-400">
+              Generation saved
+            </div>
+          )}
         </div>
-      )}
 
-      <div className="mt-7 grid gap-5 lg:grid-cols-2">
-        <section className="glass rounded-2xl p-5">
-          <h2 className="font-semibold">Input</h2>
+        {/* Error */}
+        {error && (
+          <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-4 text-red-300">
+            {error}
+          </div>
+        )}
 
-          <textarea
-            className="mt-4 min-h-[330px] w-full resize-none rounded-xl border border-white/10 bg-black/20 p-4 text-sm outline-none focus:border-violet-500/40"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={placeholder}
-          />
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* INPUT */}
+          <div className="rounded-2xl border border-white/10 bg-[#101116] p-6 shadow-xl">
+            <h2 className="mb-5 text-lg font-semibold">
+              Input
+            </h2>
 
-          <Button
-            variant="glow"
-            className="mt-3 w-full"
-            onClick={go}
-            disabled={busy || !input.trim()}
-          >
-            {busy ? (
-              "Generating..."
-            ) : (
-              <>
-                Generate <Sparkles size={15} />
-              </>
+            {/* Translator language */}
+            {isTranslator && (
+              <div className="mb-5">
+                <label className="mb-2 block text-sm font-medium text-gray-300">
+                  Translate to
+                </label>
+
+                <select
+                  value={language}
+                  onChange={(e) =>
+                    setLanguage(e.target.value)
+                  }
+                  className="w-full rounded-xl border border-white/10 bg-[#0b0c10] px-4 py-3 text-white outline-none transition focus:border-violet-500"
+                >
+                  {languages.map((item) => (
+                    <option
+                      key={item}
+                      value={item}
+                    >
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
-          </Button>
-        </section>
 
-        <section className="glass rounded-2xl p-5">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="font-semibold">Output</h2>
+            <textarea
+              value={input}
+              onChange={(e) => {
+                setInput(e.target.value);
+                setError("");
+              }}
+              placeholder={
+                isTranslator
+                  ? "Enter text you want to translate..."
+                  : `Enter your ${name.toLowerCase()} request...`
+              }
+              className="min-h-[380px] w-full resize-none rounded-xl border border-white/10 bg-[#0b0c10] p-4 text-white outline-none placeholder:text-gray-600 focus:border-violet-500"
+            />
 
-            <div className="flex gap-2">
-              <button
-                onClick={copyOutput}
-                disabled={isImage ? !imageUrl : !out}
-                className="rounded-lg border border-white/10 p-2 hover:bg-white/5 disabled:opacity-30"
-                title="Copy"
+            <div className="mt-5">
+              <Button
+                onClick={generate}
+                disabled={busy}
+                className="w-full"
               >
-                {copied ? <Check size={15} /> : <Copy size={15} />}
-              </button>
-
-              <button
-                onClick={saveOutput}
-                disabled={isImage ? !imageUrl : !out}
-                className="rounded-lg border border-white/10 p-2 hover:bg-white/5 disabled:opacity-30"
-                title="Save"
-              >
-                <Save size={15} />
-              </button>
-
-              <button
-                onClick={toggleFavorite}
-                disabled={!generationId}
-                className={`rounded-lg border p-2 disabled:opacity-30 ${
-                  favorite
-                    ? "border-pink-500/30 bg-pink-500/10 text-pink-300"
-                    : "border-white/10 hover:bg-white/5"
-                }`}
-                title="Favorite"
-              >
-                <Heart size={15} fill={favorite ? "currentColor" : "none"} />
-              </button>
-
-              <button
-                onClick={downloadOutput}
-                disabled={isImage ? !imageUrl : !out}
-                className="rounded-lg border border-white/10 p-2 hover:bg-white/5 disabled:opacity-30"
-                title="Download"
-              >
-                <Download size={15} />
-              </button>
+                {busy ? (
+                  <>
+                    <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles
+                      size={18}
+                      className="mr-2"
+                    />
+                    Generate
+                  </>
+                )}
+              </Button>
             </div>
           </div>
 
-          <div className="mt-4 min-h-[330px] rounded-xl border border-white/5 bg-black/20 p-5 text-sm leading-7 text-slate-300">
-            {isImage && imageUrl ? (
-              <div className="flex min-h-[290px] items-center justify-center">
-                <img
-                  src={imageUrl}
-                  alt={input}
-                  className="max-h-[520px] max-w-full rounded-xl object-contain"
-                />
+          {/* OUTPUT */}
+          <div className="rounded-2xl border border-white/10 bg-[#101116] p-6 shadow-xl">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">
+                Output
+              </h2>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={copyOutput}
+                  disabled={!output || isImage}
+                  title="Copy"
+                  className="rounded-xl border border-white/10 bg-[#0b0c10] p-2.5 text-gray-300 transition hover:border-violet-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {copied ? (
+                    <Check size={18} />
+                  ) : (
+                    <Copy size={18} />
+                  )}
+                </button>
+
+                <button
+                  onClick={saveOutput}
+                  disabled={!output}
+                  title="Save"
+                  className="rounded-xl border border-white/10 bg-[#0b0c10] p-2.5 text-gray-300 transition hover:border-violet-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Save size={18} />
+                </button>
+
+                <button
+                  onClick={toggleFavorite}
+                  disabled={!generationId}
+                  title="Favorite"
+                  className={`rounded-xl border border-white/10 bg-[#0b0c10] p-2.5 transition hover:border-violet-500 disabled:cursor-not-allowed disabled:opacity-40 ${
+                    favorite
+                      ? "text-pink-400"
+                      : "text-gray-300"
+                  }`}
+                >
+                  <Heart
+                    size={18}
+                    fill={
+                      favorite
+                        ? "currentColor"
+                        : "none"
+                    }
+                  />
+                </button>
+
+                <button
+                  onClick={downloadOutput}
+                  disabled={!output}
+                  title="Download"
+                  className="rounded-xl border border-white/10 bg-[#0b0c10] p-2.5 text-gray-300 transition hover:border-violet-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Download size={18} />
+                </button>
               </div>
-            ) : out ? (
-              <div className="whitespace-pre-wrap">{out}</div>
-            ) : (
-              <div className="grid min-h-[290px] place-items-center text-center text-slate-700">
-                Your generated result will appear here.
-              </div>
-            )}
+            </div>
+
+            <div className="min-h-[380px] overflow-auto rounded-xl border border-white/10 bg-[#0b0c10] p-6">
+              {!output && !busy && (
+                <div className="flex min-h-[330px] items-center justify-center text-center text-gray-600">
+                  Your generated result will appear here.
+                </div>
+              )}
+
+              {busy && (
+                <div className="flex min-h-[330px] items-center justify-center">
+                  <div className="text-center">
+                    <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-violet-500/30 border-t-violet-500" />
+
+                    <p className="text-gray-400">
+                      AI is generating your result...
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {output && isImage && (
+                <div className="flex justify-center">
+                  <img
+                    src={output}
+                    alt="AI generated"
+                    className="max-h-[600px] rounded-xl object-contain"
+                  />
+                </div>
+              )}
+
+              {output && !isImage && (
+                <div className="whitespace-pre-wrap leading-8 text-gray-200">
+                  {output}
+                </div>
+              )}
+            </div>
           </div>
-        </section>
+        </div>
       </div>
     </div>
   );
