@@ -1,4 +1,4 @@
-import { supabase } from "../config/supabase.js";
+import { supabase } from "../config/db.js";
 
 const PRO_PRICE = 499;
 
