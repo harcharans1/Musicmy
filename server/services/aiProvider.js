@@ -1,33 +1,17 @@
 const OPENROUTER_URL =
   "https://openrouter.ai/api/v1/chat/completions";
 
-const FREE_MODEL = "openrouter/free";
+const FREE_MODEL = "openai/gpt-oss-20b:free";
 
 const sleep = (ms) =>
   new Promise((resolve) => setTimeout(resolve, ms));
-
-function isRetryableError(status, message = "") {
-  const text = String(message).toLowerCase();
-
-  return (
-    status === 429 ||
-    status === 500 ||
-    status === 502 ||
-    status === 503 ||
-    status === 504 ||
-    text.includes("rate limit") ||
-    text.includes("temporarily unavailable") ||
-    text.includes("overloaded") ||
-    text.includes("timeout")
-  );
-}
 
 async function callOpenRouter(prompt) {
   const apiKey = process.env.OPENROUTER_API_KEY;
 
   if (!apiKey) {
     throw new Error(
-      "OPENROUTER_API_KEY is not configured on the server."
+      "OPENROUTER_API_KEY is not configured."
     );
   }
 
@@ -41,11 +25,9 @@ async function callOpenRouter(prompt) {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
-
           "HTTP-Referer":
             process.env.CLIENT_URL ||
             "https://musicmyy.netlify.app",
-
           "X-Title": "AIForge",
         },
 
@@ -56,7 +38,7 @@ async function callOpenRouter(prompt) {
             {
               role: "system",
               content:
-                "You are an AI assistant inside AIForge. Give clear, useful, accurate and professional answers.",
+                "You are an AI assistant inside AIForge. Give clear, useful and professional answers.",
             },
             {
               role: "user",
@@ -67,58 +49,95 @@ async function callOpenRouter(prompt) {
           temperature: 0.7,
 
           max_tokens: 2000,
+
+          reasoning: {
+            effort: "low",
+            exclude: true,
+          },
         }),
       });
 
       const data = await response.json();
 
+      console.log(
+        "OpenRouter status:",
+        response.status
+      );
+
       if (!response.ok) {
-        const errorMessage =
+        console.error(
+          "OpenRouter API error:",
+          JSON.stringify(data)
+        );
+
+        const message =
           data?.error?.message ||
           `OpenRouter request failed with status ${response.status}`;
 
-        console.error(
-          `OpenRouter attempt ${attempt + 1} failed:`,
-          errorMessage
-        );
-
         if (
-          !isRetryableError(
-            response.status,
-            errorMessage
-          ) ||
-          attempt === maxRetries
+          (response.status === 429 ||
+            response.status >= 500) &&
+          attempt < maxRetries
         ) {
-          throw new Error(errorMessage);
+          await sleep(1500 * (attempt + 1));
+          continue;
         }
 
-        await sleep(1500 * (attempt + 1));
-        continue;
+        throw new Error(message);
       }
 
-      const result =
-        data?.choices?.[0]?.message?.content;
+      const message = data?.choices?.[0]?.message;
 
-      if (!result) {
-        throw new Error(
-          "OpenRouter returned an empty response."
-        );
+      /*
+       * Normal answer
+       */
+      let result = message?.content;
+
+      /*
+       * Some models may return content as an array.
+       */
+      if (Array.isArray(result)) {
+        result = result
+          .map((item) => {
+            if (typeof item === "string") {
+              return item;
+            }
+
+            return (
+              item?.text ||
+              item?.content ||
+              ""
+            );
+          })
+          .join("")
+          .trim();
       }
 
-      return result;
+      /*
+       * Make sure we never silently accept an empty response.
+       */
+      if (
+        typeof result === "string" &&
+        result.trim().length > 0
+      ) {
+        return result.trim();
+      }
+
+      console.error(
+        "OpenRouter returned unexpected response:",
+        JSON.stringify(data)
+      );
+
+      throw new Error(
+        "OpenRouter returned an empty AI response."
+      );
     } catch (error) {
       console.error(
-        `OpenRouter attempt ${attempt + 1} error:`,
+        `OpenRouter attempt ${attempt + 1} failed:`,
         error?.message || error
       );
 
-      if (
-        !isRetryableError(
-          error?.status,
-          error?.message
-        ) ||
-        attempt === maxRetries
-      ) {
+      if (attempt >= maxRetries) {
         throw error;
       }
 
@@ -151,19 +170,13 @@ Task type: ${type || "text"}
 User request:
 ${prompt}
 
-Provide a high-quality professional response.
+Give a useful, clear and professional response.
 `);
   }
 
   async summarize({ text }) {
     return this.run(`
 Summarize the following text clearly and professionally.
-
-Requirements:
-- Keep the important information.
-- Remove unnecessary repetition.
-- Use simple and readable language.
-- Preserve the original meaning.
 
 Text:
 ${text}
@@ -172,12 +185,7 @@ ${text}
 
   async translate({ text, language }) {
     return this.run(`
-Translate the following text into ${language || "English"}.
-
-Requirements:
-- Preserve the original meaning.
-- Keep the tone natural.
-- Do not add unnecessary information.
+Translate the following text into ${language}.
 
 Text:
 ${text}
@@ -186,7 +194,7 @@ ${text}
 
   async image() {
     throw new Error(
-      "Image generation is not available through the free OpenRouter text router."
+      "Image generation is not available through the current free text AI provider."
     );
   }
 }
