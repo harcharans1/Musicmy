@@ -1,7 +1,8 @@
 const OPENROUTER_URL =
   "https://openrouter.ai/api/v1/chat/completions";
 
-const FREE_MODEL = "openai/gpt-oss-20b:free";
+const FREE_MODEL =
+  "nvidia/nemotron-3.5-lightning:free";
 
 const sleep = (ms) =>
   new Promise((resolve) => setTimeout(resolve, ms));
