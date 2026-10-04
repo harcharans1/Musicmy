@@ -49,7 +49,7 @@ async function callOpenRouter(prompt) {
 
           temperature: 0.7,
 
-          max_tokens: 2000,
+          max_tokens: 1000,
 
           reasoning: {
             effort: "low",
@@ -175,14 +175,15 @@ Give a useful, clear and professional response.
 `);
   }
 
-  async summarize({ text }) {
-    return this.run(`
-Summarize the following text clearly and professionally.
+ async summarize({ text }) {
+  return this.run(`
+Summarize the following text in 3-5 sentences.
+Be concise and keep only the important information.
 
 Text:
 ${text}
 `);
-  }
+}
 
   async translate({ text, language }) {
     return this.run(`
