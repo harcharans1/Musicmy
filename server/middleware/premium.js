@@ -5,10 +5,32 @@ const PREMIUM_TOOLS = new Set([
   "resume-builder",
 ]);
 
-const PRO_PLANS = new Set([
-  "pro",
-  "premium",
-]);
+const PRO_PLANS = new Set(["pro", "premium"]);
+
+function hasActivePro(req) {
+  if (req.user?.role === "admin") {
+    return true;
+  }
+
+  const plan = String(req.user?.plan || "").toLowerCase();
+
+  if (!PRO_PLANS.has(plan)) {
+    return false;
+  }
+
+  const expiry = req.user?.subscription_expires_at;
+
+  if (!expiry) {
+    return false;
+  }
+
+  const expiryDate = new Date(expiry);
+
+  return (
+    !Number.isNaN(expiryDate.getTime()) &&
+    expiryDate > new Date()
+  );
+}
 
 export function premiumTool(req, res, next) {
   const slug =
@@ -16,22 +38,11 @@ export function premiumTool(req, res, next) {
     req.params?.slug ||
     null;
 
-  // Admin gets full access
-  if (req.user?.role === "admin") {
-    return next();
-  }
-
-  // Normal/free tools
   if (!PREMIUM_TOOLS.has(slug)) {
     return next();
   }
 
-  const plan =
-    String(req.user?.plan || "free")
-      .toLowerCase();
-
-  // Only valid Pro plans are allowed
-  if (!PRO_PLANS.has(plan)) {
+  if (!hasActivePro(req)) {
     return res.status(403).json({
       success: false,
       code: "PREMIUM_REQUIRED",
@@ -45,18 +56,8 @@ export function premiumTool(req, res, next) {
   next();
 }
 
-
 export function requirePro(req, res, next) {
-  // Admin bypass
-  if (req.user?.role === "admin") {
-    return next();
-  }
-
-  const plan =
-    String(req.user?.plan || "free")
-      .toLowerCase();
-
-  if (!PRO_PLANS.has(plan)) {
+  if (!hasActivePro(req)) {
     return res.status(403).json({
       success: false,
       code: "PREMIUM_REQUIRED",
