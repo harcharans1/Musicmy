@@ -471,3 +471,107 @@ export async function translate(req, res) {
     });
   }
 }
+/*
+|--------------------------------------------------------------------------
+| PDF SUMMARIZER
+|--------------------------------------------------------------------------
+*/
+
+export async function pdfSummarize(req, res) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "PDF file is required.",
+      });
+    }
+
+    const MAX_PAGES_TEXT = 300000;
+
+    const pdfParse = (await import("pdf-parse")).default;
+
+    const parsed = await pdfParse(req.file.buffer);
+
+    const extractedText = String(
+      parsed?.text || ""
+    ).trim();
+
+    if (!extractedText) {
+      return res.status(422).json({
+        success: false,
+        message:
+          "Could not extract readable text from this PDF.",
+      });
+    }
+
+    if (extractedText.length > MAX_PAGES_TEXT) {
+      return res.status(413).json({
+        success: false,
+        message:
+          "PDF is too large. Please upload a shorter document.",
+      });
+    }
+
+    const provider = getAIProvider();
+
+    const result = await provider.generate({
+      prompt: extractedText,
+      type: "pdf",
+      slug: "pdf-summarizer",
+      user: req.user,
+    });
+
+    const cost = getCost(
+      "pdf",
+      "pdf-summarizer"
+    );
+
+    await chargeCredits(
+      req.user.id,
+      cost
+    );
+
+    const generation = await saveGeneration({
+      userId: req.user.id,
+      toolId: req.body?.toolId || null,
+      title:
+        req.body?.title ||
+        `PDF Summary - ${req.file.originalname}`,
+      content: result,
+      amount: cost,
+      plan: req.user.plan || "free",
+      provider: provider.name || "gemini",
+      question: req.file.originalname,
+      answer: result,
+      slug: "pdf-summarizer",
+    });
+
+    const remainingCredits =
+      await getRemainingCredits(req.user.id);
+
+    return res.json({
+      success: true,
+      result,
+      fileName: req.file.originalname,
+      pages: parsed.numpages || null,
+      characters: extractedText.length,
+      credits: remainingCredits,
+      generationId: generation.id,
+      generation,
+    });
+  } catch (error) {
+    console.error(
+      "PDF summarization error:",
+      error
+    );
+
+    return res.status(
+      error.status || 500
+    ).json({
+      success: false,
+      message:
+        error.message ||
+        "PDF summarization failed.",
+    });
+  }
+}
