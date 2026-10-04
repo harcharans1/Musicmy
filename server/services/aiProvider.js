@@ -1,14 +1,16 @@
-const OPENROUTER_URL =
-  "https://openrouter.ai/api/v1/chat/completions";
+import OpenAI from "openai";
 
-const FREE_MODEL =
-  "nvidia/nemotron-3.5-lightning:free";
+const MODEL = "gpt-5.6-luna";
 
 const sleep = (ms) =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
 /*
- * Remove visible reasoning / thinking from AI response.
+ * Clean AI output
  */
 function cleanResult(value) {
   if (typeof value !== "string") {
@@ -17,81 +19,30 @@ function cleanResult(value) {
 
   let result = value.trim();
 
-  // Remove <think>...</think>
+  // Remove accidental reasoning blocks
   result = result.replace(
     /<think>[\s\S]*?<\/think>/gi,
     ""
   );
 
-  // Remove <thinking>...</thinking>
   result = result.replace(
     /<thinking>[\s\S]*?<\/thinking>/gi,
     ""
   );
 
-  // Remove <analysis>...</analysis>
   result = result.replace(
     /<analysis>[\s\S]*?<\/analysis>/gi,
-    ""
-  );
-
-  // Remove common final tags
-  result = result.replace(
-    /<\/?final>/gi,
     ""
   );
 
   return result.trim();
 }
 
-/*
- * Extract response from OpenRouter.
- */
-function extractResult(data) {
-  const message =
-    data?.choices?.[0]?.message;
-
-  if (!message) {
-    return "";
-  }
-
-  let result = message.content;
-
-  /*
-   * Some models can return content as array.
-   */
-  if (Array.isArray(result)) {
-    result = result
-      .map((item) => {
-        if (typeof item === "string") {
-          return item;
-        }
-
-        return (
-          item?.text ||
-          item?.content ||
-          ""
-        );
-      })
-      .join("");
-  }
-
-  return cleanResult(result);
-}
 
 /*
- * OpenRouter request
+ * OpenAI request
  */
-async function callOpenRouter(prompt) {
-  const apiKey =
-    process.env.OPENROUTER_API_KEY;
-
-  if (!apiKey) {
-    throw new Error(
-      "OPENROUTER_API_KEY is not configured."
-    );
-  }
-
+async function callOpenAI(instructions, input) {
   const maxRetries = 2;
 
   for (
@@ -100,149 +51,58 @@ async function callOpenRouter(prompt) {
     attempt++
   ) {
     try {
-      const response = await fetch(
-        OPENROUTER_URL,
-        {
-          method: "POST",
+      const response = await client.responses.create({
+        model: MODEL,
 
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
+        instructions,
 
-            "HTTP-Referer":
-              process.env.CLIENT_URL ||
-              "https://musicmyy.netlify.app",
+        input,
 
-            "X-Title": "AIForge",
-          },
+        max_output_tokens: 1000,
+      });
 
-          body: JSON.stringify({
-            model: FREE_MODEL,
-
-            messages: [
-              {
-                role: "system",
-                content: `
-You are AIForge AI assistant.
-
-IMPORTANT:
-Return ONLY the final answer.
-
-Never show:
-- reasoning
-- analysis
-- thinking process
-- internal thoughts
-- planning
-- <think> tags
-- <thinking> tags
-- <analysis> tags
-
-Never say:
-"Here is my thinking"
-"Thinking process"
-"Let's analyze"
-"Reasoning"
-
-Give only the useful final response.
-                `.trim(),
-              },
-
-              {
-                role: "user",
-                content: prompt,
-              },
-            ],
-
-            temperature: 0.3,
-
-            max_tokens: 1000,
-
-            /*
-             * Ask OpenRouter to exclude reasoning
-             * when supported by the model/provider.
-             */
-            reasoning: {
-              effort: "low",
-              exclude: true,
-            },
-          }),
-        }
+      const result = cleanResult(
+        response.output_text
       );
 
-      const data =
-        await response.json();
-
-      console.log(
-        "OpenRouter status:",
-        response.status
-      );
-
-      if (!response.ok) {
-        console.error(
-          "OpenRouter API error:",
-          JSON.stringify(data)
-        );
-
-        const message =
-          data?.error?.message ||
-          `OpenRouter request failed with status ${response.status}`;
-
-        /*
-         * Retry rate-limit/server errors.
-         */
-        if (
-          (
-            response.status === 429 ||
-            response.status >= 500
-          ) &&
-          attempt < maxRetries
-        ) {
-          await sleep(
-            1500 * (attempt + 1)
-          );
-
-          continue;
-        }
-
-        throw new Error(message);
-      }
-
-      const result =
-        extractResult(data);
-
-      if (result.length > 0) {
+      if (result) {
         return result;
       }
 
-      console.error(
-        "OpenRouter returned empty response:",
-        JSON.stringify(data)
-      );
-
       throw new Error(
-        "OpenRouter returned an empty AI response."
+        "OpenAI returned an empty response."
       );
     } catch (error) {
       console.error(
-        `OpenRouter attempt ${
-          attempt + 1
-        } failed:`,
+        `OpenAI attempt ${attempt + 1} failed:`,
         error?.message || error
       );
 
-      if (attempt >= maxRetries) {
-        throw error;
+      /*
+       * Retry temporary errors
+       */
+      const status = error?.status;
+
+      if (
+        attempt < maxRetries &&
+        (
+          status === 429 ||
+          status >= 500
+        )
+      ) {
+        await sleep(
+          1500 * (attempt + 1)
+        );
+
+        continue;
       }
 
-      await sleep(
-        1500 * (attempt + 1)
-      );
+      throw error;
     }
   }
 
   throw new Error(
-    "OpenRouter request failed."
+    "OpenAI request failed."
   );
 }
 
@@ -250,21 +110,29 @@ Give only the useful final response.
 /*
  * AI Provider
  */
-class OpenRouterProvider {
+class OpenAIProvider {
   constructor() {
-    this.name =
-      "openrouter-free";
+    this.name = "openai";
 
-    if (!process.env.OPENROUTER_API_KEY) {
+    if (!process.env.OPENAI_API_KEY) {
       throw new Error(
-        "OPENROUTER_API_KEY is missing."
+        "OPENAI_API_KEY is missing."
       );
     }
   }
 
 
-  async run(prompt) {
-    return callOpenRouter(prompt);
+  /*
+   * Generic AI request
+   */
+  async run(
+    instructions,
+    input
+  ) {
+    return callOpenAI(
+      instructions,
+      input
+    );
   }
 
 
@@ -275,27 +143,27 @@ class OpenRouterProvider {
     prompt,
     type,
   }) {
-    return this.run(`
+    return this.run(
+      `
+You are AIForge, a professional AI assistant.
+
 Task type:
 ${type || "text"}
 
-User request:
-${prompt}
-
 STRICT RULES:
-Return ONLY the final answer.
 
-Do not show:
-- reasoning
-- analysis
-- thinking
-- planning
-- internal thoughts
+- Return ONLY the final answer.
+- Never show reasoning.
+- Never show internal analysis.
+- Never show thinking.
+- Never describe your thought process.
+- Do not add unnecessary commentary.
+- Follow the user's request exactly.
+- Give a clear, useful and professional answer.
+      `.trim(),
 
-Do not explain how you generated the answer.
-
-Give a clear, useful and professional final response.
-    `.trim());
+      prompt
+    );
   }
 
 
@@ -305,25 +173,27 @@ Give a clear, useful and professional final response.
   async summarize({
     text,
   }) {
-    return this.run(`
-You are a professional summarization engine.
-
-Summarize the following text.
+    return this.run(
+      `
+You are AIForge's professional summarization engine.
 
 STRICT RULES:
-- Return ONLY the final summary.
-- Do NOT show reasoning.
-- Do NOT show analysis.
-- Do NOT show thinking.
-- Do NOT explain the process.
-- Do NOT add unnecessary commentary.
-- Keep the important information.
-- Keep it concise.
-- Preserve the original meaning.
 
-Text:
-${text}
-    `.trim());
+- Return ONLY the final summary.
+- Do not explain the process.
+- Do not show reasoning.
+- Do not show analysis.
+- Do not show thinking.
+- Do not add unnecessary commentary.
+- Keep only important information.
+- Preserve the original meaning.
+- Keep the summary concise.
+      `.trim(),
+
+      `Summarize this text:
+
+${text}`
+    );
   }
 
 
@@ -334,51 +204,53 @@ ${text}
     text,
     language,
   }) {
-    return this.run(`
-You are a professional translation engine.
+    return this.run(
+      `
+You are AIForge's professional translation engine.
 
-Translate the text below into:
-
-TARGET LANGUAGE:
+Target language:
 ${language}
 
 STRICT RULES:
-- Return ONLY the translated text.
-- Do NOT explain anything.
-- Do NOT show reasoning.
-- Do NOT show analysis.
-- Do NOT show thinking.
-- Do NOT describe the translation.
-- Do NOT write "Translation:".
-- Do NOT write "Here is the translation".
-- Do NOT add notes.
-- Do NOT add commentary.
-- Do NOT use markdown.
-- Preserve the original meaning.
-- Use natural and grammatically correct ${language}.
 
-TEXT:
-${text}
-    `.trim());
+- Return ONLY the translated text.
+- Do not explain anything.
+- Do not show reasoning.
+- Do not show analysis.
+- Do not show thinking.
+- Do not describe the translation.
+- Do not write "Translation:".
+- Do not write "Here is the translation".
+- Do not add notes.
+- Do not add commentary.
+- Do not use markdown unless it exists in the original text.
+- Preserve the exact meaning.
+- Use natural and grammatically correct ${language}.
+      `.trim(),
+
+      `Translate this text into ${language}:
+
+${text}`
+    );
   }
 
 
   /*
    * Image generation
    *
-   * Current free provider is text-only.
+   * Keep disabled for now.
    */
   async image() {
     throw new Error(
-      "Image generation is not available through the current free text AI provider."
+      "Image generation is not available through the current AI text provider."
     );
   }
 }
 
 
 /*
- * Export provider
+ * Export
  */
 export function getAIProvider() {
-  return new OpenRouterProvider();
+  return new OpenAIProvider();
 }
