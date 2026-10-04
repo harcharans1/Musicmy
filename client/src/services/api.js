@@ -7,11 +7,7 @@ export const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("aiforge_token");
-
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
@@ -20,10 +16,8 @@ export const authApi = {
   login: (data) => api.post("/auth/login", data),
   me: () => api.get("/auth/me"),
   logout: () => api.post("/auth/logout"),
-  forgotPassword: (email) =>
-    api.post("/auth/forgot-password", { email }),
-  resetPassword: (data) =>
-    api.post("/auth/reset-password", data),
+  forgotPassword: (email) => api.post("/auth/forgot-password", { email }),
+  resetPassword: (data) => api.post("/auth/reset-password", data),
 };
 
 export const toolApi = {
@@ -44,8 +38,7 @@ export const userApi = {
   history: () => api.get("/user/history"),
   deleteHistory: (id) => api.delete(`/user/history/${id}`),
   favorites: () => api.get("/user/favorites"),
-  addFavorite: (generationId) =>
-    api.post("/user/favorites", { generationId }),
+  addFavorite: (generationId) => api.post("/user/favorites", { generationId }),
   removeFavorite: (id) => api.delete(`/user/favorites/${id}`),
   usage: () => api.get("/user/usage"),
 };
@@ -57,6 +50,15 @@ export const savedOutputApi = {
 };
 
 export const paymentApi = {
-  createSubscription: () => api.post("/payment/create"),
-  verifySubscription: (data) => api.post("/payment/verify", data),
+  config: () => api.get("/payment/config"),
+  submitRequest: (data) => api.post("/payment/request", data),
+  myRequests: () => api.get("/payment/my-requests"),
+};
+
+export const adminPaymentApi = {
+  list: (status = "pending") =>
+    api.get("/payment/admin/requests", { params: { status } }),
+  approve: (id) => api.post(`/payment/admin/requests/${id}/approve`),
+  reject: (id, reason) =>
+    api.post(`/payment/admin/requests/${id}/reject`, { reason }),
 };

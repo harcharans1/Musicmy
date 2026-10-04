@@ -1,7 +1,5 @@
-import { Link } from "react-router-dom";
-import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Check, Lock, Sparkles, Zap } from "lucide-react";
-import { paymentApi } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
 const freeTools = [
@@ -22,106 +20,32 @@ const proTools = [
   "Priority premium access",
 ];
 
-function loadRazorpayScript() {
-  return new Promise((resolve) => {
-    if (window.Razorpay) return resolve(true);
-
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-}
-
 export function Pricing() {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const navigate = useNavigate();
 
   const isPro =
     user?.role === "admin" ||
     user?.plan === "pro" ||
     user?.plan === "premium";
 
-  const startPro = async () => {
-    setError("");
-
+  const startPro = () => {
     if (!user) {
-      window.location.href = "/login?redirect=/pricing";
+      navigate("/login?redirect=/pricing");
       return;
     }
 
-    if (isPro) return;
-
-    try {
-      setLoading(true);
-
-      const response = await paymentApi.createSubscription();
-      const data = response.data;
-
-      if (!data?.success || !data?.subscriptionId || !data?.keyId) {
-        throw new Error(data?.message || "Unable to create subscription.");
-      }
-
-      const loaded = await loadRazorpayScript();
-
-      if (!loaded) {
-        throw new Error("Razorpay checkout could not be loaded.");
-      }
-
-      const options = {
-        key: data.keyId,
-        subscription_id: data.subscriptionId,
-        name: "AIForge",
-        description: "AIForge Pro Monthly Subscription",
-        image: "/logo.png",
-        prefill: {
-          name: user.name || "",
-          email: user.email || "",
-        },
-        theme: {
-          color: "#7c3aed",
-        },
-        handler: async (paymentResponse) => {
-          try {
-            await paymentApi.verifySubscription(paymentResponse);
-            window.location.href = "/dashboard/subscription";
-          } catch (err) {
-            setError(
-              err?.response?.data?.message ||
-                "Payment verification failed. Please contact support."
-            );
-          }
-        },
-        modal: {
-          ondismiss: () => setLoading(false),
-        },
-      };
-
-      const razorpay = new window.Razorpay(options);
-
-      razorpay.on("payment.failed", (response) => {
-        setError(
-          response?.error?.description ||
-            "Payment failed. Please try again."
-        );
-        setLoading(false);
-      });
-
-      razorpay.open();
-    } catch (err) {
-      setError(
-        err?.response?.data?.message ||
-          err?.message ||
-          "Unable to start payment."
-      );
-      setLoading(false);
+    if (isPro) {
+      navigate("/dashboard/subscription");
+      return;
     }
+
+    // Manual UPI payment + admin verification
+    navigate("/payment");
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white px-4 py-16">
+    <main className="min-h-screen bg-slate-950 px-4 py-16 text-white">
       <div className="mx-auto max-w-6xl">
         <div className="mx-auto max-w-3xl text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-violet-400/20 bg-violet-400/10 px-4 py-2 text-sm text-violet-200">
@@ -139,13 +63,9 @@ export function Pricing() {
           </p>
         </div>
 
-        {error && (
-          <div className="mx-auto mt-8 max-w-2xl rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-center text-sm text-red-200">
-            {error}
-          </div>
-        )}
-
         <div className="mt-14 grid gap-8 lg:grid-cols-2">
+
+          {/* FREE */}
           <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-8 shadow-2xl">
             <div className="flex items-center justify-between">
               <div>
@@ -189,6 +109,8 @@ export function Pricing() {
             </Link>
           </section>
 
+
+          {/* PRO */}
           <section className="relative overflow-hidden rounded-3xl border border-violet-400/40 bg-gradient-to-br from-violet-600/20 via-fuchsia-500/10 to-white/[0.04] p-8 shadow-2xl">
             <div className="absolute right-6 top-6 rounded-full bg-violet-500 px-3 py-1 text-xs font-bold">
               PRO
@@ -233,14 +155,13 @@ export function Pricing() {
             <button
               type="button"
               onClick={startPro}
-              disabled={loading || isPro}
-              className="mt-9 flex w-full items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 py-3 font-semibold transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-9 flex w-full items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 py-3 font-semibold transition hover:bg-violet-500"
             >
-              {isPro ? "✓ You are on Pro" : loading ? "Opening Checkout..." : "Upgrade to Pro"}
+              {isPro ? "✓ Manage Pro Subscription" : "Upgrade to Pro — ₹499"}
             </button>
 
             <p className="mt-4 text-center text-xs text-slate-500">
-              Secure payment powered by Razorpay.
+              UPI payment • Admin verification • Pro activation
             </p>
           </section>
         </div>
@@ -249,28 +170,32 @@ export function Pricing() {
   );
 }
 
-export function Static() {
+
+export function Static({ title = "AIForge" }) {
   return (
-    <main className="min-h-screen bg-slate-950 text-white px-4 py-20">
+    <main className="min-h-screen bg-slate-950 px-4 py-20 text-white">
       <div className="mx-auto max-w-5xl text-center">
         <p className="text-sm font-semibold uppercase tracking-[0.3em] text-violet-400">
           AIForge
         </p>
+
         <h1 className="mt-5 text-5xl font-bold sm:text-7xl">
-          AI tools built for everyday work.
+          {title}
         </h1>
+
         <p className="mx-auto mt-6 max-w-2xl text-lg text-slate-400">
-          Write, summarize, translate, code and create with a single AI
-          workspace.
+          AIForge helps you write, summarize, translate, code and create
+          with powerful AI tools.
         </p>
 
         <div className="mt-10 flex justify-center gap-4">
           <Link
-            to="/tools"
+            to="/ai-tools"
             className="rounded-2xl bg-violet-600 px-6 py-3 font-semibold hover:bg-violet-500"
           >
             Explore Tools
           </Link>
+
           <Link
             to="/pricing"
             className="rounded-2xl border border-white/10 px-6 py-3 font-semibold hover:bg-white/10"
@@ -283,11 +208,15 @@ export function Static() {
   );
 }
 
+
 export function Blog() {
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-16 text-white">
       <div className="mx-auto max-w-6xl">
-        <h1 className="text-4xl font-bold">AIForge Blog</h1>
+        <h1 className="text-4xl font-bold">
+          AIForge Blog
+        </h1>
+
         <p className="mt-3 text-slate-400">
           AI tips, productivity ideas and product updates.
         </p>
@@ -302,10 +231,14 @@ export function Blog() {
               key={title}
               className="rounded-3xl border border-white/10 bg-white/[0.04] p-6"
             >
-              <h2 className="text-xl font-semibold">{title}</h2>
+              <h2 className="text-xl font-semibold">
+                {title}
+              </h2>
+
               <p className="mt-3 text-sm leading-6 text-slate-400">
                 Practical AI ideas for students, creators and developers.
               </p>
+
               <Link
                 to="/blog"
                 className="mt-5 inline-block text-sm font-semibold text-violet-400"

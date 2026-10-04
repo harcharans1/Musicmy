@@ -15,6 +15,9 @@ import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Admin from "./pages/Admin";
 
+import PaymentPage from "./pages/PaymentPage";
+import AdminPayments from "./pages/AdminPayments";
+
 import {
   History,
   Favorites,
@@ -56,7 +59,15 @@ function Protected() {
 -------------------------------- */
 
 function AdminOnly() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-[#07080d] text-white">
+        Loading...
+      </div>
+    );
+  }
 
   return user?.role === "admin" ? (
     <Outlet />
@@ -125,14 +136,14 @@ export default function App() {
           <Route
             path="/contact"
             element={
-              <Static title="Contact" />
+              <Static title="Contact AIForge" />
             }
           />
 
           <Route
             path="/faq"
             element={
-              <Static title="FAQ" />
+              <Static title="Frequently Asked Questions" />
             }
           />
 
@@ -167,24 +178,31 @@ export default function App() {
           element={<Auth register />}
         />
 
-        {/* Forgot Password */}
         <Route
           path="/forgot-password"
           element={<ForgotPassword />}
         />
 
-        {/* Reset Password */}
         <Route
           path="/reset-password"
           element={<ResetPassword />}
         />
 
+
         {/* ================================
-            PROTECTED DASHBOARD
+            PROTECTED USER ROUTES
         ================================= */}
 
         <Route element={<Protected />}>
 
+          {/* Manual UPI Payment */}
+          <Route
+            path="/payment"
+            element={<PaymentPage />}
+          />
+
+
+          {/* Dashboard */}
           <Route element={<DashboardLayout />}>
 
             <Route
@@ -224,7 +242,7 @@ export default function App() {
 
 
             {/* ================================
-                ADMIN
+                ADMIN ROUTES
             ================================= */}
 
             <Route element={<AdminOnly />}>
@@ -232,6 +250,11 @@ export default function App() {
               <Route
                 path="/admin"
                 element={<Admin />}
+              />
+
+              <Route
+                path="/admin/payments"
+                element={<AdminPayments />}
               />
 
             </Route>
