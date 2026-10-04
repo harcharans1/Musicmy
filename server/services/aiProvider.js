@@ -65,6 +65,7 @@ async function callGemini(instructions, input) {
           config: {
             systemInstruction:
               instructions,
+
             maxOutputTokens: 1400,
           },
         });
@@ -194,7 +195,8 @@ Generate:
 Use the programming language requested by the user.
 
 Do not reveal reasoning.
-Return the code and only the useful supporting information.
+
+Return the code and only useful supporting information.
 `,
 
   "code-explainer": `
@@ -276,6 +278,7 @@ Extract:
 - action items
 
 Do not invent information.
+
 Preserve the original meaning.
 `,
 
@@ -306,8 +309,11 @@ class GeminiProvider {
   }
 
   /*
-   * Generic text request
-   */
+  |--------------------------------------------------------------------------
+  | Generic Text Request
+  |--------------------------------------------------------------------------
+  */
+
   async run(instructions, input) {
     return callGemini(
       `${BASE_RULES}\n\n${instructions}`,
@@ -316,8 +322,11 @@ class GeminiProvider {
   }
 
   /*
-   * AI Tools
-   */
+  |--------------------------------------------------------------------------
+  | AI Tools
+  |--------------------------------------------------------------------------
+  */
+
   async generate({
     prompt,
     type,
@@ -343,8 +352,11 @@ Produce the most useful final answer.
   }
 
   /*
-   * Summarizer
-   */
+  |--------------------------------------------------------------------------
+  | Summarizer
+  |--------------------------------------------------------------------------
+  */
+
   async summarize({
     text,
   }) {
@@ -369,8 +381,11 @@ ${text}`
   }
 
   /*
-   * Translator
-   */
+  |--------------------------------------------------------------------------
+  | Translator
+  |--------------------------------------------------------------------------
+  */
+
   async translate({
     text,
     language,
@@ -403,7 +418,7 @@ ${text}`
 
   /*
   |--------------------------------------------------------------------------
-  | IMAGE GENERATOR
+  | IMAGE GENERATION
   |--------------------------------------------------------------------------
   */
 
@@ -414,22 +429,34 @@ ${text}`
       !prompt ||
       !String(prompt).trim()
     ) {
-      throw new Error(
+      const error = new Error(
         "Image prompt is required."
       );
+
+      error.status = 400;
+
+      throw error;
     }
 
     try {
+      const cleanPrompt =
+        String(prompt).trim();
+
+      /*
+       * Gemini 3.1 Flash Image
+       *
+       * Official Gemini API:
+       * ai.interactions.create()
+       */
+
       const interaction =
         await ai.interactions.create({
           model: IMAGE_MODEL,
 
-          input:
-            String(prompt).trim(),
+          input: cleanPrompt,
 
           response_format: {
             type: "image",
-            mime_type: "image/png",
             aspect_ratio: "1:1",
             image_size: "1K",
           },
@@ -442,8 +469,13 @@ ${text}`
         !generatedImage ||
         !generatedImage.data
       ) {
+        console.error(
+          "Gemini image response:",
+          interaction
+        );
+
         throw new Error(
-          "Gemini did not return a generated image."
+          "Gemini did not return an image."
         );
       }
 
@@ -452,20 +484,38 @@ ${text}`
         "image/png";
 
       /*
-       * Return browser-ready
-       * data URL.
+       * Convert Gemini base64 image
+       * into browser-ready data URL.
        */
-      return `data:${mimeType};base64,${generatedImage.data}`;
+      const imageData =
+        generatedImage.data;
+
+      return `data:${mimeType};base64,${imageData}`;
     } catch (error) {
       console.error(
         "Gemini image generation error:",
         error?.message || error
       );
 
-      throw new Error(
-        error?.message ||
-        "Image generation failed. Please try again."
-      );
+      /*
+       * Keep useful Gemini/API errors.
+       */
+      if (
+        error?.status ||
+        error?.statusCode
+      ) {
+        throw error;
+      }
+
+      const imageError =
+        new Error(
+          error?.message ||
+          "Image generation failed. Please try again."
+        );
+
+      imageError.status = 500;
+
+      throw imageError;
     }
   }
 }
