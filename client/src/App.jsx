@@ -11,6 +11,7 @@ import Tools from "./pages/Tools";
 import ToolWorkspace from "./pages/ToolWorkspace";
 import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Admin from "./pages/Admin";
 
@@ -172,6 +173,11 @@ export default function App() {
           element={<ForgotPassword />}
         />
 
+        {/* Reset Password */}
+        <Route
+          path="/reset-password"
+          element={<ResetPassword />}
+        />
 
         {/* ================================
             PROTECTED DASHBOARD

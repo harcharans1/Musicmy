@@ -16,6 +16,12 @@ export const authApi = {
   login: (data) => api.post("/auth/login", data),
   me: () => api.get("/auth/me"),
   logout: () => api.post("/auth/logout"),
+
+  forgotPassword: (email) =>
+    api.post("/auth/forgot-password", { email }),
+
+  resetPassword: (data) =>
+    api.post("/auth/reset-password", data),
 };
 
 export const toolApi = {
