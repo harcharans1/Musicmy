@@ -2,11 +2,24 @@ import { supabase } from "../config/db.js";
 import { chargeCredits } from "../services/credits.js";
 import { getAIProvider } from "../services/aiProvider.js";
 
+/*
+|--------------------------------------------------------------------------
+| Credit Cost
+|--------------------------------------------------------------------------
+*/
+
 const getCost = (type) => {
   if (type === "image") return 10;
   if (type === "pdf") return 5;
+
   return 1;
 };
+
+/*
+|--------------------------------------------------------------------------
+| Get Remaining Credits
+|--------------------------------------------------------------------------
+*/
 
 async function getRemainingCredits(userId) {
   const { data, error } = await supabase
@@ -15,20 +28,28 @@ async function getRemainingCredits(userId) {
     .eq("id", userId)
     .single();
 
-  if (error) throw error;
+  if (error) {
+    throw error;
+  }
 
   return Number(data?.credits || 0);
 }
 
+/*
+|--------------------------------------------------------------------------
+| Save Generation
+|--------------------------------------------------------------------------
+*/
+
 async function saveGeneration({
   userId,
   toolId = null,
-  title,
+  title = "AI Generation",
   content,
   status = "completed",
   amount = 0,
   plan = "free",
-  provider = "openrouter-free",
+  provider = "openai",
   transactionId = null,
   question = null,
   answer = null,
@@ -66,6 +87,18 @@ async function saveGeneration({
   return data;
 }
 
+/*
+|--------------------------------------------------------------------------
+| Finish Generation
+|--------------------------------------------------------------------------
+|
+| AI response successful hon ton baad:
+| 1. Credits charge
+| 2. Generation save
+| 3. Remaining credits return
+|
+*/
+
 async function finishGeneration({
   req,
   res,
@@ -78,11 +111,13 @@ async function finishGeneration({
   provider,
 }) {
   /*
-   * Provider successfully generated the result.
-   * Credits are charged only now.
+   * Charge credits only after successful AI response.
    */
   await chargeCredits(req.user.id, cost);
 
+  /*
+   * Save generation in Supabase.
+   */
   const generation = await saveGeneration({
     userId: req.user.id,
     toolId,
@@ -90,16 +125,22 @@ async function finishGeneration({
     content: result,
     amount: cost,
     plan: req.user.plan || "free",
-    provider: provider?.name || "openrouter-free",
+    provider: provider?.name || "openai",
     question: prompt,
     answer: result,
     slug,
   });
 
+  /*
+   * Get updated credits.
+   */
   const remainingCredits = await getRemainingCredits(
     req.user.id
   );
 
+  /*
+   * Send response.
+   */
   return res.json({
     success: true,
     result,
@@ -125,27 +166,42 @@ export async function generate(req, res) {
       title = "AI Generation",
     } = req.body;
 
+    /*
+     * Validate prompt.
+     */
     if (!prompt || !String(prompt).trim()) {
       return res.status(400).json({
+        success: false,
         message: "Prompt is required",
       });
     }
 
+    const cleanPrompt = String(prompt).trim();
+
     const cost = getCost(type);
 
+    /*
+     * Get AI provider.
+     */
     const provider = getAIProvider();
 
     /*
      * IMPORTANT:
-     * AI is called BEFORE charging credits.
-     * If OpenRouter fails, user keeps their credits.
+     *
+     * slug is passed to the AI provider.
+     * This allows different AI tools to use
+     * their own instructions.
      */
     const result = await provider.generate({
-      prompt: String(prompt).trim(),
+      prompt: cleanPrompt,
       type,
+      slug,
       user: req.user,
     });
 
+    /*
+     * Finish generation.
+     */
     return finishGeneration({
       req,
       res,
@@ -154,7 +210,7 @@ export async function generate(req, res) {
       title,
       slug,
       toolId,
-      prompt,
+      prompt: cleanPrompt,
       provider,
     });
   } catch (error) {
@@ -184,24 +240,30 @@ export async function image(req, res) {
       title = "AI Image Generation",
     } = req.body;
 
+    /*
+     * Validate prompt.
+     */
     if (!prompt || !String(prompt).trim()) {
       return res.status(400).json({
+        success: false,
         message: "Image prompt is required",
       });
     }
 
-    const cost = 10;
+    const cleanPrompt = String(prompt).trim();
+
+    const cost = getCost("image");
 
     const provider = getAIProvider();
 
     /*
-     * Current free OpenRouter provider does not support
-     * image generation.
+     * Current provider may not support image generation.
      *
-     * Provider will throw an error before credits are charged.
+     * If unavailable, provider throws an error here.
+     * Credits are NOT charged.
      */
     const result = await provider.image({
-      prompt: String(prompt).trim(),
+      prompt: cleanPrompt,
       user: req.user,
     });
 
@@ -213,7 +275,7 @@ export async function image(req, res) {
       title,
       slug,
       toolId,
-      prompt,
+      prompt: cleanPrompt,
       provider,
     });
   } catch (error) {
@@ -243,25 +305,33 @@ export async function summarize(req, res) {
       title = "AI Summary",
     } = req.body;
 
+    /*
+     * Validate text.
+     */
     if (!text || !String(text).trim()) {
       return res.status(400).json({
+        success: false,
         message: "Text is required",
       });
     }
 
-    const cost = 1;
+    const cleanText = String(text).trim();
+
+    const cost = getCost("text");
 
     const provider = getAIProvider();
 
     /*
-     * Generate first.
-     * Charge only after successful AI response.
+     * Generate summary first.
      */
     const result = await provider.summarize({
-      text: String(text).trim(),
+      text: cleanText,
       user: req.user,
     });
 
+    /*
+     * Charge + save + return.
+     */
     return finishGeneration({
       req,
       res,
@@ -270,7 +340,7 @@ export async function summarize(req, res) {
       title,
       slug,
       toolId,
-      prompt: text,
+      prompt: cleanText,
       provider,
     });
   } catch (error) {
@@ -301,27 +371,45 @@ export async function translate(req, res) {
       title = "AI Translation",
     } = req.body;
 
-    if (!text || !language) {
+    /*
+     * Validate text.
+     */
+    if (!text || !String(text).trim()) {
       return res.status(400).json({
-        message:
-          "Text and target language are required",
+        success: false,
+        message: "Text is required",
       });
     }
 
-    const cost = 1;
+    /*
+     * Validate target language.
+     */
+    if (!language || !String(language).trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Target language is required",
+      });
+    }
+
+    const cleanText = String(text).trim();
+    const cleanLanguage = String(language).trim();
+
+    const cost = getCost("text");
 
     const provider = getAIProvider();
 
     /*
-     * Generate first.
-     * Charge only after successful AI response.
+     * Generate translation first.
      */
     const result = await provider.translate({
-      text: String(text).trim(),
-      language: String(language).trim(),
+      text: cleanText,
+      language: cleanLanguage,
       user: req.user,
     });
 
+    /*
+     * Charge + save + return.
+     */
     return finishGeneration({
       req,
       res,
@@ -330,7 +418,7 @@ export async function translate(req, res) {
       title,
       slug,
       toolId,
-      prompt: text,
+      prompt: cleanText,
       provider,
     });
   } catch (error) {
