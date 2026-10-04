@@ -185,78 +185,83 @@ export async function adminPaymentRequests(req, res) {
   });
 }
 
-export async function approvePaymentRequest(req, res) {
-  if (!requireUser(req, res) || !requireAdmin(req, res)) return;
+export async function approvePaymentRequest(
+  req,
+  res
+) {
+  if (
+    !requireUser(req, res) ||
+    !requireAdmin(req, res)
+  ) {
+    return;
+  }
 
-  const id = String(req.params.id || "").trim();
+  const id =
+    String(req.params.id || "").trim();
 
   if (!id) {
     return res.status(400).json({
       success: false,
-      message: "Payment request ID is required.",
+      message:
+        "Payment request ID is required.",
     });
   }
 
-  const { data: request, error: requestError } = await supabase
-    .from("payment_requests")
-    .select("*")
-    .eq("id", id)
-    .single();
+  const { data, error } =
+    await supabase.rpc(
+      "approve_payment_request",
+      {
+        p_request_id: id,
+        p_admin_id: req.user.id,
+      }
+    );
 
-  if (requestError || !request) {
-    return res.status(404).json({
-      success: false,
-      message: "Payment request not found.",
-    });
-  }
+  if (error) {
+    console.error(
+      "Admin payment approval error:",
+      error
+    );
 
-  if (request.status !== "pending") {
-    return res.status(409).json({
-      success: false,
-      message: `Request is already ${request.status}.`,
-    });
-  }
+    const message =
+      String(error.message || "");
 
-  const { data: updatedUser, error: userError } = await supabase
-    .from("users")
-    .update({ plan: "pro" })
-    .eq("id", request.user_id)
-    .select("id,email,name,plan")
-    .single();
+    if (
+      message.includes(
+        "PAYMENT_REQUEST_NOT_FOUND"
+      )
+    ) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Payment request not found.",
+      });
+    }
 
-  if (userError) {
-    console.error("Admin user upgrade error:", userError);
+    if (
+      message.includes(
+        "PAYMENT_REQUEST_NOT_PENDING"
+      )
+    ) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "Payment request is no longer pending.",
+      });
+    }
+
     return res.status(500).json({
       success: false,
-      message: "Could not activate Pro for this user.",
-    });
-  }
-
-  const { data: updatedRequest, error: updateError } = await supabase
-    .from("payment_requests")
-    .update({
-      status: "approved",
-      reviewed_by: req.user.id,
-      reviewed_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .eq("status", "pending")
-    .select("*")
-    .single();
-
-  if (updateError) {
-    console.error("Admin payment approval error:", updateError);
-    return res.status(500).json({
-      success: false,
-      message: "User was upgraded but payment request status could not be updated.",
+      message:
+        "Could not activate Pro for this user.",
     });
   }
 
   return res.json({
     success: true,
-    message: "Payment approved and Pro activated.",
-    request: updatedRequest,
-    user: updatedUser,
+    message:
+      "Payment approved and Pro activated for 1 month.",
+    request: data.request,
+    user: data.user,
   });
 }
 

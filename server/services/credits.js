@@ -2,7 +2,9 @@ import { supabase } from "../config/db.js";
 
 export async function chargeCredits(userId, cost) {
   if (!userId) {
-    const error = new Error("User ID is required");
+    const error =
+      new Error("User ID is required");
+
     error.status = 400;
     throw error;
   }
@@ -11,43 +13,45 @@ export async function chargeCredits(userId, cost) {
     return null;
   }
 
-  const { data: user, error: findError } = await supabase
-    .from("users")
-    .select("id,credits")
-    .eq("id", userId)
-    .maybeSingle();
+  const { data, error } =
+    await supabase.rpc(
+      "consume_user_credits",
+      {
+        p_user_id: userId,
+        p_cost: Number(cost),
+      }
+    );
 
-  if (findError) {
-    throw findError;
-  }
+  if (error) {
+    const message =
+      String(error.message || "");
 
-  if (!user) {
-    const error = new Error("User not found");
-    error.status = 404;
+    if (
+      message.includes(
+        "INSUFFICIENT_CREDITS"
+      )
+    ) {
+      const e =
+        new Error("Insufficient credits");
+
+      e.status = 402;
+      throw e;
+    }
+
+    if (
+      message.includes(
+        "USER_NOT_FOUND"
+      )
+    ) {
+      const e =
+        new Error("User not found");
+
+      e.status = 404;
+      throw e;
+    }
+
     throw error;
   }
 
-  if (user.credits < cost) {
-    const error = new Error("Insufficient credits");
-    error.status = 402;
-    throw error;
-  }
-
-  const newCredits = user.credits - cost;
-
-  const { data: updatedUser, error: updateError } = await supabase
-    .from("users")
-    .update({
-      credits: newCredits,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", userId)
-    .select("id,credits")
-    .single();
-
-  if (updateError) {
-    throw updateError;
-  }
-
-  return updatedUser.credits;
+  return Number(data);
 }

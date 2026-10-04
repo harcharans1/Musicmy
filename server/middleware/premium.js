@@ -5,34 +5,33 @@ const PREMIUM_TOOLS = new Set([
   "resume-builder",
 ]);
 
+const PRO_PLANS = new Set([
+  "pro",
+  "premium",
+]);
+
 export function premiumTool(req, res, next) {
   const slug =
     req.body?.slug ||
     req.params?.slug ||
     null;
 
-  /*
-   * Admin always has access.
-   */
+  // Admin gets full access
   if (req.user?.role === "admin") {
     return next();
   }
 
-  /*
-   * Only selected tools require Pro.
-   */
+  // Normal/free tools
   if (!PREMIUM_TOOLS.has(slug)) {
     return next();
   }
 
-  /*
-   * Free users cannot access premium tools.
-   */
   const plan =
     String(req.user?.plan || "free")
       .toLowerCase();
 
-  if (plan === "free") {
+  // Only valid Pro plans are allowed
+  if (!PRO_PLANS.has(plan)) {
     return res.status(403).json({
       success: false,
       code: "PREMIUM_REQUIRED",
@@ -43,16 +42,12 @@ export function premiumTool(req, res, next) {
     });
   }
 
-  return next();
+  next();
 }
 
-/*
-|--------------------------------------------------------------------------
-| Dedicated premium route middleware
-|--------------------------------------------------------------------------
-*/
 
 export function requirePro(req, res, next) {
+  // Admin bypass
   if (req.user?.role === "admin") {
     return next();
   }
@@ -61,10 +56,7 @@ export function requirePro(req, res, next) {
     String(req.user?.plan || "free")
       .toLowerCase();
 
-  if (
-    plan !== "pro" &&
-    plan !== "premium"
-  ) {
+  if (!PRO_PLANS.has(plan)) {
     return res.status(403).json({
       success: false,
       code: "PREMIUM_REQUIRED",
