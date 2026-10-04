@@ -4,11 +4,38 @@ import { getAIProvider } from "../services/aiProvider.js";
 
 /*
 |--------------------------------------------------------------------------
-| Credit Cost
+| Credit Costs
 |--------------------------------------------------------------------------
 */
 
-const getCost = (type) => {
+const TOOL_COSTS = {
+  "ai-writer": 1,
+  "ai-paraphraser": 1,
+  "ai-summarizer": 1,
+  "ai-translator": 1,
+  "ai-image-generator": 10,
+  "ai-image-enhancer": 5,
+  "code-generator": 2,
+  "code-explainer": 2,
+  "pdf-summarizer": 5,
+  "caption-generator": 1,
+  "resume-builder": 4,
+  "email-writer": 1,
+};
+
+const getCost = (type = "text", slug = null) => {
+  /*
+   * First priority:
+   * Tool slug based cost.
+   */
+  if (slug && TOOL_COSTS[slug] !== undefined) {
+    return TOOL_COSTS[slug];
+  }
+
+  /*
+   * Fallback:
+   * Type based cost.
+   */
   if (type === "image") return 10;
   if (type === "pdf") return 5;
 
@@ -178,7 +205,10 @@ export async function generate(req, res) {
 
     const cleanPrompt = String(prompt).trim();
 
-    const cost = getCost(type);
+    /*
+     * Get tool-specific credit cost.
+     */
+    const cost = getCost(type, slug);
 
     /*
      * Get AI provider.
@@ -252,7 +282,10 @@ export async function image(req, res) {
 
     const cleanPrompt = String(prompt).trim();
 
-    const cost = getCost("image");
+    /*
+     * Get image tool-specific cost.
+     */
+    const cost = getCost("image", slug);
 
     const provider = getAIProvider();
 
@@ -317,7 +350,10 @@ export async function summarize(req, res) {
 
     const cleanText = String(text).trim();
 
-    const cost = getCost("text");
+    /*
+     * Get tool-specific cost.
+     */
+    const cost = getCost("text", slug);
 
     const provider = getAIProvider();
 
@@ -394,7 +430,10 @@ export async function translate(req, res) {
     const cleanText = String(text).trim();
     const cleanLanguage = String(language).trim();
 
-    const cost = getCost("text");
+    /*
+     * Get tool-specific cost.
+     */
+    const cost = getCost("text", slug);
 
     const provider = getAIProvider();
 

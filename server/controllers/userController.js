@@ -4,7 +4,9 @@ export async function profile(req, res) {
   try {
     const { data: user, error } = await supabase
       .from("users")
-      .select("id,name,email,role,plan,credits,created_at,updated_at")
+      .select(
+        "id,name,email,role,plan,credits,created_at,updated_at"
+      )
       .eq("id", req.user.id)
       .maybeSingle();
 
@@ -46,7 +48,9 @@ export async function dashboard(req, res) {
     ] = await Promise.all([
       supabase
         .from("users")
-        .select("id,name,email,role,plan,credits,created_at,updated_at")
+        .select(
+          "id,name,email,role,plan,credits,created_at,updated_at"
+        )
         .eq("id", req.user.id)
         .maybeSingle(),
 
@@ -181,6 +185,7 @@ export async function dashboard(req, res) {
 /* =========================
    HISTORY
 ========================= */
+
 export async function history(req, res) {
   try {
     const { data, error } = await supabase
@@ -199,7 +204,10 @@ export async function history(req, res) {
       generations: data || [],
     });
   } catch (error) {
-    console.error("History error:", error);
+    console.error(
+      "History error:",
+      error
+    );
 
     res.status(500).json({
       message: "Failed to load history",
@@ -221,10 +229,14 @@ export async function deleteHistory(req, res) {
 
     res.json({
       success: true,
-      message: "History deleted successfully",
+      message:
+        "History deleted successfully",
     });
   } catch (error) {
-    console.error("Delete history error:", error);
+    console.error(
+      "Delete history error:",
+      error
+    );
 
     res.status(500).json({
       message: "Failed to delete history",
@@ -236,26 +248,29 @@ export async function deleteHistory(req, res) {
    FAVORITES
 ========================= */
 
-/* =========================
-   FAVORITES
-========================= */
-
 export async function favorites(req, res) {
   try {
-    const { data: favoriteRows, error } =
-      await supabase
-        .from("favorites")
-        .select("id,generation_id,created_at")
-        .eq("user_id", req.user.id)
-        .order("created_at", {
-          ascending: false,
-        });
+    const {
+      data: favoriteRows,
+      error,
+    } = await supabase
+      .from("favorites")
+      .select(
+        "id,generation_id,created_at"
+      )
+      .eq("user_id", req.user.id)
+      .order("created_at", {
+        ascending: false,
+      });
 
     if (error) throw error;
 
     const generationIds =
       (favoriteRows || [])
-        .map((item) => item.generation_id)
+        .map(
+          (item) =>
+            item.generation_id
+        )
         .filter(Boolean);
 
     if (!generationIds.length) {
@@ -264,35 +279,42 @@ export async function favorites(req, res) {
       });
     }
 
-    const { data: generations, error: generationError } =
-      await supabase
-        .from("generations")
-        .select(
-          "id,title,content,question,answer,slug,status,amount,provider,created_at"
-        )
-        .in("id", generationIds)
-        .eq("user_id", req.user.id);
+    const {
+      data: generations,
+      error: generationError,
+    } = await supabase
+      .from("generations")
+      .select(
+        "id,title,content,question,answer,slug,status,amount,provider,created_at"
+      )
+      .in("id", generationIds)
+      .eq("user_id", req.user.id);
 
     if (generationError) {
       throw generationError;
     }
 
     const generationMap = new Map(
-      (generations || []).map((item) => [
-        item.id,
-        item,
-      ])
+      (generations || []).map(
+        (item) => [
+          item.id,
+          item,
+        ]
+      )
     );
 
-    const result = (favoriteRows || [])
-      .map((favorite) => ({
-        ...favorite,
-        generation:
-          generationMap.get(
-            favorite.generation_id
-          ) || null,
-      }))
-      .filter((item) => item.generation);
+    const result =
+      (favoriteRows || [])
+        .map((favorite) => ({
+          ...favorite,
+          generation:
+            generationMap.get(
+              favorite.generation_id
+            ) || null,
+        }))
+        .filter(
+          (item) => item.generation
+        );
 
     res.json({
       favorites: result,
@@ -304,11 +326,11 @@ export async function favorites(req, res) {
     );
 
     res.status(500).json({
-      message: "Failed to load favorites",
+      message:
+        "Failed to load favorites",
     });
   }
 }
-
 
 /* =========================
    ADD FAVORITE
@@ -326,13 +348,15 @@ export async function addFavorite(req, res) {
       });
     }
 
-    const { data: generation, error: generationError } =
-      await supabase
-        .from("generations")
-        .select("id")
-        .eq("id", generationId)
-        .eq("user_id", req.user.id)
-        .maybeSingle();
+    const {
+      data: generation,
+      error: generationError,
+    } = await supabase
+      .from("generations")
+      .select("id")
+      .eq("id", generationId)
+      .eq("user_id", req.user.id)
+      .maybeSingle();
 
     if (generationError) {
       throw generationError;
@@ -345,23 +369,26 @@ export async function addFavorite(req, res) {
       });
     }
 
-    const { data, error } =
-      await supabase
-        .from("favorites")
-        .upsert(
-          {
-            user_id: req.user.id,
-            generation_id: generationId,
-          },
-          {
-            onConflict:
-              "user_id,generation_id",
-          }
-        )
-        .select(
-          "id,generation_id,created_at"
-        )
-        .single();
+    const {
+      data,
+      error,
+    } = await supabase
+      .from("favorites")
+      .upsert(
+        {
+          user_id: req.user.id,
+          generation_id:
+            generationId,
+        },
+        {
+          onConflict:
+            "user_id,generation_id",
+        }
+      )
+      .select(
+        "id,generation_id,created_at"
+      )
+      .single();
 
     if (error) throw error;
 
@@ -384,7 +411,6 @@ export async function addFavorite(req, res) {
   }
 }
 
-
 /* =========================
    REMOVE FAVORITE
 ========================= */
@@ -398,7 +424,10 @@ export async function removeFavorite(req, res) {
         .from("favorites")
         .delete()
         .eq("id", id)
-        .eq("user_id", req.user.id);
+        .eq(
+          "user_id",
+          req.user.id
+        );
 
     if (error) throw error;
 
@@ -426,27 +455,94 @@ export async function removeFavorite(req, res) {
 
 export async function usage(req, res) {
   try {
-    const { data, error } = await supabase
-      .from("generations")
-      .select("id,amount,created_at")
-      .eq("user_id", req.user.id)
-      .order("created_at", {
-        ascending: false,
+    /*
+     * Get user credits + plan
+     * and complete generation history
+     * at the same time.
+     */
+    const [
+      userResult,
+      generationsResult,
+    ] = await Promise.all([
+      supabase
+        .from("users")
+        .select("credits,plan")
+        .eq("id", req.user.id)
+        .maybeSingle(),
+
+      supabase
+        .from("generations")
+        .select(
+          "id,amount,created_at,title,slug,status,provider"
+        )
+        .eq("user_id", req.user.id)
+        .order("created_at", {
+          ascending: false,
+        }),
+    ]);
+
+    /*
+     * Check user query error.
+     */
+    if (userResult.error) {
+      throw userResult.error;
+    }
+
+    /*
+     * Check generation query error.
+     */
+    if (generationsResult.error) {
+      throw generationsResult.error;
+    }
+
+    /*
+     * User must exist.
+     */
+    if (!userResult.data) {
+      return res.status(404).json({
+        message: "User not found",
       });
+    }
 
-    if (error) throw error;
+    const generations =
+      generationsResult.data || [];
 
-    const generations = data || [];
+    /*
+     * Calculate total credits used.
+     */
+    const creditsUsed =
+      generations.reduce(
+        (total, item) =>
+          total +
+          Number(item.amount || 0),
+        0
+      );
 
-    const creditsUsed = generations.reduce(
-      (total, item) =>
-        total + Number(item.amount || 0),
-      0
-    );
+    /*
+     * Current credits directly
+     * from users table.
+     */
+    const creditsRemaining =
+      Number(
+        userResult.data.credits || 0
+      );
 
+    /*
+     * Current user plan.
+     */
+    const plan =
+      userResult.data.plan ||
+      "free";
+
+    /*
+     * Send complete usage response.
+     */
     res.json({
+      creditsRemaining,
       creditsUsed,
-      generations: generations.length,
+      generations:
+        generations.length,
+      plan,
       history: generations,
     });
   } catch (error) {
@@ -456,7 +552,8 @@ export async function usage(req, res) {
     );
 
     res.status(500).json({
-      message: "Failed to load usage",
+      message:
+        "Failed to load usage",
     });
   }
 }
