@@ -11,6 +11,7 @@ import {
   addFavorite,
   removeFavorite,
   usage,
+  updateProfile,
 } from "../controllers/userController.js";
 
 const router = Router();
@@ -63,15 +64,6 @@ router.get(
   usage
 );
 
-router.put(
-  "/profile",
-  protect,
-  (req, res) => {
-    res.json({
-      message:
-        "Profile update endpoint ready",
-    });
-  }
-);
+router.put("/profile", protect, updateProfile);
 
 export default router;

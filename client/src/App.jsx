@@ -30,6 +30,10 @@ import {
   Static,
   Pricing,
   Blog,
+  BlogPost,
+  Contact,
+  FAQ,
+  Legal,
 } from "./pages/Static";
 
 import StartupLoader from "./components/StartupLoader";
@@ -136,28 +140,28 @@ export default function App() {
           <Route
             path="/contact"
             element={
-              <Static title="Contact AIForge" />
+              <Contact />
             }
           />
 
           <Route
             path="/faq"
             element={
-              <Static title="Frequently Asked Questions" />
+              <FAQ />
             }
           />
 
           <Route
             path="/privacy"
             element={
-              <Static title="Privacy Policy" />
+              <Legal type="privacy" />
             }
           />
 
           <Route
             path="/terms"
             element={
-              <Static title="Terms & Conditions" />
+              <Legal type="terms" />
             }
           />
 

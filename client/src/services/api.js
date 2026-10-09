@@ -30,6 +30,7 @@ export const aiApi = {
   image: (data) => api.post("/ai/image", data),
   summarize: (data) => api.post("/ai/summarize", data),
   translate: (data) => api.post("/ai/translate", data),
+  pdfSummarize: (formData) => api.post("/ai/pdf-summarize", formData, { headers: { "Content-Type": "multipart/form-data" } }),
 };
 
 export const userApi = {
@@ -41,6 +42,7 @@ export const userApi = {
   addFavorite: (generationId) => api.post("/user/favorites", { generationId }),
   removeFavorite: (id) => api.delete(`/user/favorites/${id}`),
   usage: () => api.get("/user/usage"),
+  updateProfile: (data) => api.put("/user/profile", data),
 };
 
 export const savedOutputApi = {
@@ -61,4 +63,19 @@ export const adminPaymentApi = {
   approve: (id) => api.post(`/payment/admin/requests/${id}/approve`),
   reject: (id, reason) =>
     api.post(`/payment/admin/requests/${id}/reject`, { reason }),
+};
+
+export const contentApi = {
+  faqs: () => api.get("/content/faqs"),
+  blog: () => api.get("/content/blog"),
+  blogPost: (slug) => api.get(`/content/blog/${slug}`),
+  contact: (data) => api.post("/content/contact", data),
+};
+
+export const adminApi = {
+  dashboard: () => api.get("/admin/dashboard"),
+  users: () => api.get("/admin/users"),
+  revenue: () => api.get("/admin/revenue"),
+  usage: () => api.get("/admin/usage"),
+  updateUser: (id, data) => api.patch(`/admin/users/${id}`, data),
 };

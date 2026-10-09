@@ -1,4 +1,6 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { contentApi } from "../services/api";
 import { Check, Lock, Sparkles, Zap } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -171,84 +173,28 @@ export function Pricing() {
 }
 
 
-export function Static({ title = "AIForge" }) {
-  return (
-    <main className="min-h-screen bg-slate-950 px-4 py-20 text-white">
-      <div className="mx-auto max-w-5xl text-center">
-        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-violet-400">
-          AIForge
-        </p>
-
-        <h1 className="mt-5 text-5xl font-bold sm:text-7xl">
-          {title}
-        </h1>
-
-        <p className="mx-auto mt-6 max-w-2xl text-lg text-slate-400">
-          AIForge helps you write, summarize, translate, code and create
-          with powerful AI tools.
-        </p>
-
-        <div className="mt-10 flex justify-center gap-4">
-          <Link
-            to="/ai-tools"
-            className="rounded-2xl bg-violet-600 px-6 py-3 font-semibold hover:bg-violet-500"
-          >
-            Explore Tools
-          </Link>
-
-          <Link
-            to="/pricing"
-            className="rounded-2xl border border-white/10 px-6 py-3 font-semibold hover:bg-white/10"
-          >
-            View Pricing
-          </Link>
-        </div>
-      </div>
-    </main>
-  );
-}
-
-
-export function Blog() {
+export function Static({ title = "AIForge", children }) {
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-16 text-white">
-      <div className="mx-auto max-w-6xl">
-        <h1 className="text-4xl font-bold">
-          AIForge Blog
-        </h1>
-
-        <p className="mt-3 text-slate-400">
-          AI tips, productivity ideas and product updates.
-        </p>
-
-        <div className="mt-10 grid gap-6 md:grid-cols-3">
-          {[
-            "How to use AI for productivity",
-            "AI coding workflow for developers",
-            "Writing better prompts",
-          ].map((title) => (
-            <article
-              key={title}
-              className="rounded-3xl border border-white/10 bg-white/[0.04] p-6"
-            >
-              <h2 className="text-xl font-semibold">
-                {title}
-              </h2>
-
-              <p className="mt-3 text-sm leading-6 text-slate-400">
-                Practical AI ideas for students, creators and developers.
-              </p>
-
-              <Link
-                to="/blog"
-                className="mt-5 inline-block text-sm font-semibold text-violet-400"
-              >
-                Read more →
-              </Link>
-            </article>
-          ))}
-        </div>
+      <div className="mx-auto max-w-5xl">
+        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-violet-400">AIForge</p>
+        <h1 className="mt-4 text-4xl font-bold sm:text-6xl">{title}</h1>
+        <div className="mt-8 text-slate-300">{children || <p>AIForge helps you write, summarize, translate, code and create with AI.</p>}</div>
       </div>
     </main>
   );
 }
+
+export function Blog() {
+  const [posts, setPosts] = useState([]); const [loading,setLoading]=useState(true);
+  useEffect(()=>{contentApi.blog().then(r=>setPosts(r.data?.posts||[])).catch(()=>{}).finally(()=>setLoading(false));},[]);
+  return <main className="min-h-screen bg-slate-950 px-4 py-16 text-white"><div className="mx-auto max-w-6xl"><p className="text-sm font-semibold uppercase tracking-[.3em] text-violet-400">AIForge</p><h1 className="mt-3 text-4xl font-bold">AIForge Blog</h1><p className="mt-3 text-slate-400">AI tips, productivity ideas and product updates.</p>{loading?<div className="mt-10 text-slate-500">Loading posts...</div>:<div className="mt-10 grid gap-6 md:grid-cols-3">{posts.map(p=><article key={p.id} className="rounded-3xl border border-white/10 bg-white/[.04] p-6"><h2 className="text-xl font-semibold">{p.title}</h2><p className="mt-3 text-sm leading-6 text-slate-400">{p.excerpt}</p><Link to={`/blog/${p.slug}`} className="mt-5 inline-block text-sm font-semibold text-violet-400">Read more →</Link></article>)}</div>}</div></main>;
+}
+
+export function BlogPost(){ const {slug}=useParams(); const [post,setPost]=useState(null); const [loading,setLoading]=useState(true); useEffect(()=>{contentApi.blogPost(slug).then(r=>setPost(r.data?.post)).catch(()=>setPost(null)).finally(()=>setLoading(false));},[slug]); if(loading)return <Static title="Loading article…"/>; if(!post)return <Static title="Article not found"/>; return <main className="min-h-screen bg-slate-950 px-4 py-16 text-white"><article className="mx-auto max-w-3xl"><p className="text-sm text-violet-400">AIForge Blog</p><h1 className="mt-4 text-4xl font-bold sm:text-5xl">{post.title}</h1><p className="mt-4 text-slate-400">{post.excerpt}</p><div className="mt-10 whitespace-pre-wrap text-base leading-8 text-slate-200">{post.content}</div></article></main>; }
+
+export function Contact(){ const [form,setForm]=useState({name:"",email:"",subject:"",message:""}); const [state,setState]=useState({loading:false,message:"",error:""}); const submit=async e=>{e.preventDefault();setState({loading:true,message:"",error:""});try{const r=await contentApi.contact(form);setState({loading:false,message:r.data.message,error:""});setForm({name:"",email:"",subject:"",message:""});}catch(err){setState({loading:false,message:"",error:err.response?.data?.message||"Could not send message."});}}; return <Static title="Contact AIForge"><div className="max-w-2xl"><p>Have a question or need help? Send us a message.</p>{state.message&&<div className="mt-5 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-emerald-200">{state.message}</div>}{state.error&&<div className="mt-5 rounded-xl border border-red-400/20 bg-red-400/10 p-4 text-red-200">{state.error}</div>}<form onSubmit={submit} className="mt-8 space-y-4">{[["name","Name"],["email","Email"],["subject","Subject"]].map(([k,l])=><input key={k} required={k!=="subject"} type={k==="email"?"email":"text"} value={form[k]} onChange={e=>setForm({...form,[k]:e.target.value})} placeholder={l} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 outline-none focus:border-violet-400"/>)}<textarea required rows="6" value={form.message} onChange={e=>setForm({...form,message:e.target.value})} placeholder="Message" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 outline-none focus:border-violet-400"/><button disabled={state.loading} className="w-full rounded-xl bg-violet-600 px-5 py-3 font-semibold disabled:opacity-50">{state.loading?"Sending…":"Send Message"}</button></form></div></Static>; }
+
+export function FAQ(){ const [faqs,setFaqs]=useState([]); useEffect(()=>{contentApi.faqs().then(r=>setFaqs(r.data?.faqs||[])).catch(()=>{});},[]); return <Static title="Frequently Asked Questions"><div className="space-y-4">{faqs.map(f=><details key={f.id} className="rounded-2xl border border-white/10 bg-white/[.04] p-5"><summary className="cursor-pointer font-semibold">{f.question}</summary><p className="mt-3 leading-7 text-slate-400">{f.answer}</p></details>)}</div></Static>; }
+
+export function Legal({type}){ const privacy=type==='privacy'; return <Static title={privacy?'Privacy Policy':'Terms & Conditions'}><div className="space-y-6 leading-8 text-slate-400"><p>{privacy?'AIForge only uses account information needed to provide authentication, AI tools, credits, support and payment verification.':'By using AIForge, you agree to use the service lawfully and not abuse, overload or attempt to compromise the platform.'}</p><p>{privacy?'Passwords are stored as secure hashes and API secrets remain on the server. You can contact us to request account assistance.':'AI-generated output should be reviewed by you before publication or use. Premium access is activated after payment verification and may expire according to the selected plan.'}</p></div></Static>; }

@@ -134,3 +134,29 @@ export async function usage(req, res) {
     });
   }
 }
+
+export async function updateUser(req,res){
+  try{
+    const { id } = req.params;
+    const { role, plan, credits } = req.body || {};
+    const updates = { updated_at: new Date().toISOString() };
+    if (role !== undefined) {
+      if (!['user','admin'].includes(String(role))) return res.status(400).json({message:'Invalid role.'});
+      updates.role = String(role);
+    }
+    if (plan !== undefined) {
+      if (!['free','pro','premium'].includes(String(plan))) return res.status(400).json({message:'Invalid plan.'});
+      updates.plan = String(plan);
+      if (updates.plan === 'free') { updates.subscription_started_at = null; updates.subscription_expires_at = null; }
+      if (updates.plan !== 'free' && !updates.subscription_expires_at) updates.subscription_expires_at = new Date(Date.now()+30*24*60*60*1000).toISOString();
+    }
+    if (credits !== undefined) {
+      const value = Number(credits);
+      if (!Number.isInteger(value) || value < 0 || value > 1000000) return res.status(400).json({message:'Credits must be a valid non-negative integer.'});
+      updates.credits = value;
+    }
+    const {data,error}=await supabase.from('users').update(updates).eq('id',id).select('id,name,email,role,plan,credits,subscription_started_at,subscription_expires_at,created_at,updated_at').single();
+    if(error) return res.status(404).json({message:'User not found or could not be updated.'});
+    res.json({success:true,user:data});
+  }catch(error){ console.error('Admin update user error:',error); res.status(500).json({message:'Failed to update user'}); }
+}

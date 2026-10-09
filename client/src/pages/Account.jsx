@@ -902,98 +902,10 @@ export const Subscription = () => {
 
 export const Settings = () => {
   const { profile, loading, error, reload } = useAccountProfile();
-
-  if (loading) {
-    return (
-      <Page title="Account Settings">
-        <LoadingBox text="Loading account settings..." />
-      </Page>
-    );
-  }
-
-  return (
-    <Page title="Account Settings">
-      <div className="flex justify-end">
-        <button
-          onClick={reload}
-          className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm hover:bg-white/10"
-        >
-          <RefreshCw size={16} />
-          Refresh
-        </button>
-      </div>
-
-      <ErrorBox message={error} />
-
-      <div className="glass mt-5 max-w-2xl rounded-2xl p-6">
-        <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-xl bg-violet-500/10 text-violet-300">
-            <User size={21} />
-          </div>
-          <div>
-            <h2 className="font-semibold">Profile information</h2>
-            <p className="text-sm text-slate-500">
-              Your current account details.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-6 space-y-4">
-          <div>
-            <label className="mb-2 block text-xs text-slate-500">
-              Name
-            </label>
-            <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm">
-              {profile?.name || "—"}
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-2 block text-xs text-slate-500">
-              Email
-            </label>
-            <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm">
-              {profile?.email || "—"}
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-xs text-slate-500">
-                Plan
-              </label>
-              <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm capitalize">
-                {profile?.plan || "free"}
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-xs text-slate-500">
-                Role
-              </label>
-              <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm capitalize">
-                {profile?.role || "user"}
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-2 block text-xs text-slate-500">
-              Member since
-            </label>
-            <div className="inline-flex w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm">
-              <CalendarDays size={16} className="text-violet-300" />
-              {formatDate(profile?.created_at) || "—"}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 rounded-xl border border-white/10 bg-black/20 p-4 text-sm leading-6 text-slate-500">
-          Profile editing is not enabled yet because the current backend
-          profile-update route is only a placeholder. This page intentionally
-          does not show a fake save action.
-        </div>
-      </div>
-    </Page>
-  );
+  const [form,setForm]=useState({name:"",email:"",currentPassword:"",newPassword:""});
+  const [saving,setSaving]=useState(false); const [message,setMessage]=useState(""); const [saveError,setSaveError]=useState("");
+  useEffect(()=>{if(profile)setForm({name:profile.name||"",email:profile.email||"",currentPassword:"",newPassword:""});},[profile]);
+  const save=async e=>{e.preventDefault();setSaving(true);setMessage("");setSaveError("");try{const r=await userApi.updateProfile(form);setMessage(r.data?.message||"Profile updated.");await reload();setForm(x=>({...x,currentPassword:"",newPassword:""}));}catch(err){setSaveError(err.response?.data?.message||"Failed to update profile.");}finally{setSaving(false);}};
+  if(loading)return <Page title="Account Settings"><LoadingBox text="Loading account settings..."/></Page>;
+  return <Page title="Account Settings"><ErrorBox message={error||saveError}/>{message&&<div className="mb-5 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm text-emerald-200">{message}</div>}<form onSubmit={save} className="glass max-w-2xl rounded-2xl p-6"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-xl bg-violet-500/10 text-violet-300"><User size={21}/></div><div><h2 className="font-semibold">Profile & security</h2><p className="text-sm text-slate-500">Update your account details and password.</p></div></div><div className="mt-6 space-y-4"><label className="block"><span className="mb-2 block text-xs text-slate-500">Name</span><input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 outline-none focus:border-violet-400"/></label><label className="block"><span className="mb-2 block text-xs text-slate-500">Email</span><input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 outline-none focus:border-violet-400"/></label><div className="grid gap-4 sm:grid-cols-2"><label className="block"><span className="mb-2 block text-xs text-slate-500">Current password</span><input type="password" value={form.currentPassword} onChange={e=>setForm({...form,currentPassword:e.target.value})} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 outline-none focus:border-violet-400"/></label><label className="block"><span className="mb-2 block text-xs text-slate-500">New password</span><input type="password" value={form.newPassword} onChange={e=>setForm({...form,newPassword:e.target.value})} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 outline-none focus:border-violet-400"/></label></div></div><div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center"><button disabled={saving} className="rounded-xl bg-violet-600 px-5 py-3 font-semibold hover:bg-violet-500 disabled:opacity-50">{saving?"Saving…":"Save changes"}</button><button type="button" onClick={reload} className="rounded-xl border border-white/10 px-5 py-3 text-sm hover:bg-white/10">Refresh</button><span className="text-xs text-slate-500 sm:ml-auto">Plan: {profile?.plan||"free"} · Role: {profile?.role||"user"}</span></div></form></Page>;
 };

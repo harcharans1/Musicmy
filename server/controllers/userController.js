@@ -557,3 +557,38 @@ export async function usage(req, res) {
     });
   }
 }
+export async function updateProfile(req, res) {
+  try {
+    const { name, email, currentPassword, newPassword } = req.body || {};
+    const updates = {};
+    if (name !== undefined) {
+      const cleanName = String(name).trim();
+      if (cleanName.length < 2 || cleanName.length > 80) return res.status(400).json({ message: "Name must be between 2 and 80 characters." });
+      updates.name = cleanName;
+    }
+    if (email !== undefined) {
+      const cleanEmail = String(email).trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) return res.status(400).json({ message: "Enter a valid email address." });
+      const { data: duplicate } = await supabase.from("users").select("id").eq("email", cleanEmail).neq("id", req.user.id).maybeSingle();
+      if (duplicate) return res.status(409).json({ message: "Email is already in use." });
+      updates.email = cleanEmail;
+    }
+    if (newPassword) {
+      if (!currentPassword) return res.status(400).json({ message: "Current password is required." });
+      if (String(newPassword).length < 6) return res.status(400).json({ message: "New password must be at least 6 characters." });
+      const bcrypt = await import("bcryptjs");
+      const { data: current } = await supabase.from("users").select("password").eq("id", req.user.id).single();
+      const ok = await bcrypt.compare(String(currentPassword), current?.password || "");
+      if (!ok) return res.status(401).json({ message: "Current password is incorrect." });
+      updates.password = await bcrypt.hash(String(newPassword), 12);
+    }
+    if (!Object.keys(updates).length) return res.status(400).json({ message: "No profile changes provided." });
+    updates.updated_at = new Date().toISOString();
+    const { data, error } = await supabase.from("users").update(updates).eq("id", req.user.id).select("id,name,email,role,plan,credits,created_at,updated_at").single();
+    if (error) throw error;
+    res.json({ success: true, message: "Profile updated successfully.", user: data });
+  } catch (error) {
+    console.error("Update profile error:", error);
+    res.status(500).json({ message: "Failed to update profile." });
+  }
+}
